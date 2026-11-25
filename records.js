@@ -77,3 +77,5 @@ export function changeCaseMember(guild,id,actor,member,include) {
     return true;
   });
 }
+
+export const activeWanted = guild => db.prepare("SELECT r.id,r.title,e.body FROM records r JOIN entries e ON e.id=(SELECT min(id) FROM entries WHERE record=r.id) WHERE r.guild=? AND r.kind='wanted' AND r.closed=0 ORDER BY r.id DESC LIMIT 501").all(guild);

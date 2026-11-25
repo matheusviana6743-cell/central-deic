@@ -39,7 +39,7 @@ export function deskCard(kind) {
       : '**Uma central para o trabalho da equipe em Travessia.**\n\n📁 Abra e acompanhe investigações.\n📸 Reúna relatos, prints e clipes no histórico do caso.\n🎙️ Dentro do caso, abra uma mesa ou tocaia e registre o resultado da cena.';
   return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:'DEIC  |  '+title,description,footer:{text:'Polícia Civil • Travessia RP'}}],components:admin?
     [row(button('stats','Produção da equipe',ButtonStyle.Primary),button('queue','Fichas e tickets'),button('access','Acesso à inteligência'),button('archive','Canais antigos'))]:
-    [row(button('new:'+kind,intel?'Cadastrar dossiê':'Abrir caso',ButtonStyle.Primary),button('list:'+kind+':0','Consultar registros'),button('find:'+kind,'Pesquisar')), ...(intel?[row(button('new:wanted','Cadastrar procurado RP'),button('list:wanted:0','Ver procurados RP'),button('find:wanted','Consultar passaporte RP'))]:[])]};
+    [row(button('new:'+kind,intel?'Cadastrar dossiê':'Abrir caso',ButtonStyle.Primary),button('list:'+kind+':0','Consultar registros'),button('find:'+kind,'Pesquisar')), ...(intel?[row(button('new:wanted','Cadastrar procurado RP'),button('list:wanted:0','Ver procurados RP'),button('find:wanted','Consultar passaporte RP'),button('catalog:wanted','Baixar catálogo'))]:[])]};
 }
 
 export async function publishDesks(guild, groups) {
@@ -137,6 +137,17 @@ export async function handleDesk(i) {
       }
       const id=records.create(i.guildId,kind,name,i.user.id,body);
       return await detail(i,records.get(i.guildId,id));
+    }
+    if(action==='catalog' && kind==='wanted'){
+      const active=records.activeWanted(i.guildId);
+      if(active.length>500) return await say(i,'O catálogo excede 500 fichas ativas. Consulte pelo passaporte RP.');
+      const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const cards=active.map(record=>{
+        const photo=record.body.match(/https:\/\/(?:cdn|media)\.discordapp\.(?:com|net)\/attachments\/[^\s<>"']+/i)?.[0];
+        return '<article><h2>'+escape(record.title)+'</h2><p>'+escape(record.body)+'</p>'+(photo?'<img loading="lazy" alt="Print do personagem RP" src="'+escape(photo)+'">':'')+'</article>';
+      });
+      const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="referrer" content="no-referrer"><title>Procurados RP | DEIC</title><style>body{margin:3rem auto;padding:0 1rem;max-width:56rem;background:#101923;color:#edf0f4;font:1rem system-ui}h1{color:#ebcd88}article{background:#1b2938;padding:1rem;margin:1rem 0;border-radius:12px}p{white-space:pre-wrap;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style><h1>Procurados RP</h1><p>DEIC · Travessia RP · Personagens fictícios</p>'+(cards.join('')||'<p>Nenhuma ficha ativa.</p>')+'</html>';
+      return await i.editReply({content:'Catálogo interno de personagens de Travessia RP.',files:[{attachment:Buffer.from(html),name:'procurados-travessia.html'}]});
     }
     if(action==='search') return await listing(i,kind,0,Buffer.from(input(i,'query')).toString('base64url'));
     if(action==='list') return await listing(i,kind,Number(arg),extra);
