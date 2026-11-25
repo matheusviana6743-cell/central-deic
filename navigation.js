@@ -8,9 +8,9 @@ export const participationRow=()=>new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId('community:perfil').setLabel('Meu perfil').setStyle(ButtonStyle.Primary),
   new ButtonBuilder().setCustomId('community:presenca').setLabel('Registrar presença').setStyle(ButtonStyle.Success),
   new ButtonBuilder().setCustomId('community:ranking').setLabel('Ranking').setStyle(ButtonStyle.Secondary));
-export const academyRow=()=>new ActionRowBuilder().addComponents(
+export const academyRow=(includeProfile=true)=>new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId('academy:menu').setLabel('Abrir academia').setStyle(ButtonStyle.Primary),
-  new ButtonBuilder().setCustomId('community:perfil').setLabel('Meu progresso').setStyle(ButtonStyle.Secondary));
+  ...(includeProfile?[new ButtonBuilder().setCustomId('community:perfil').setLabel('Meu progresso').setStyle(ButtonStyle.Secondary)]:[]));
 export function handlesNavigation(i){return (i.isChatInputCommand()&&i.commandName==='central')||(i.isButton()&&i.customId==='central:open');}
 export async function handleNavigation(i){
   try{
@@ -23,7 +23,7 @@ export async function handleNavigation(i){
       if(visible.length)fields.push({name:section.name,value:visible.map(c=>'<#'+c.id+'>').join(' · ')});
     }
     const isTeam=i.member.roles.cache.some(r=>teamRoles.has(r.name));
-    await i.editReply({embeds:[{color:0x245589,title:'DEIC · Central de navegação',description:'Selecione um canal disponível para o seu cargo. A visibilidade acompanha as permissões do Discord.',fields,footer:{text:'Travessia RP · Ambiente fictício'}}],components:isTeam?[participationRow(),academyRow()]:[],allowedMentions:{parse:[]}});
+    await i.editReply({embeds:[{color:0x245589,title:'DEIC · Central de navegação',description:'Selecione um canal disponível para o seu cargo. A visibilidade acompanha as permissões do Discord.',fields,footer:{text:'Travessia RP · Ambiente fictício'}}],components:isTeam?[participationRow(),academyRow(false)]:[],allowedMentions:{parse:[]}});
   }catch(e){
     console.error('Falha na navegação',e.code??e.name);
     const payload={content:'Não foi possível carregar a central.',allowedMentions:{parse:[]}};

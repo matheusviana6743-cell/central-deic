@@ -44,3 +44,12 @@ test('community check-in button records at most one daily point',async()=>{
   await handleParticipation(base);assert.match(result.content,/já registrou/);
   await handleParticipation({...base,member:outsider});assert.match(result.content,/exclusivo/);
 });
+
+test('team navigation never repeats component IDs across rows',async()=>{
+  let result;
+  await handleNavigation({...roles(member),guild:{channels:{fetch:async()=>[]}},deferReply:async()=>{},editReply:async p=>{result=p;}});
+  const ids=result.components.flatMap(row=>row.toJSON().components.map(c=>c.custom_id));
+  assert.equal(new Set(ids).size,ids.length);
+  assert.deepEqual(ids,['community:perfil','community:presenca','community:ranking','academy:menu']);
+  assert.equal(academyRow().toJSON().components.length,2);
+});
