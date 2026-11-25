@@ -1,7 +1,7 @@
 import { downloadGameImage,imageAttachment,previewKey } from './form-media.js';
 import { ActionRowBuilder,ButtonBuilder,ButtonStyle,ChannelType,MessageFlags,ModalBuilder,OverwriteType,PermissionFlagsBits,SlashCommandBuilder,TextInputBuilder,TextInputStyle } from 'discord.js';
-import { team } from './deic.js';
-import { formKinds,formPayload,formCard,characterCatalog } from './form-model.js';
+import { team,sameChannelName } from './deic.js';
+import { formKinds,formPayload,formCard,characterCatalog,formLayout,selectFormCategory } from './form-model.js';
 import * as db from './records.js';
 const quiet={flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}},mentions={parse:[]};
 const row=(...items)=>new ActionRowBuilder().addComponents(...items);
@@ -32,27 +32,37 @@ async function setup(i){
  const permissionOverwrites=[{id:g.id,type:OverwriteType.Role,deny:[PermissionFlagsBits.ViewChannel]},{id:bot.id,type:OverwriteType.Member,allow:[...access,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ManageChannels]},...names.map(r=>({id:r.id,type:OverwriteType.Role,allow:access,deny:[PermissionFlagsBits.SendMessages,PermissionFlagsBits.CreatePublicThreads,PermissionFlagsBits.CreatePrivateThreads,PermissionFlagsBits.SendMessagesInThreads]}))];
  for(const [kind,spec] of Object.entries(formKinds)){
   let channels=await g.channels.fetch();const old=db.formSection(g.id,kind);
-  const name=spec.icon+'・DEIC | '+spec.name+' · Registros';
-  let cat=old&&channels.get(old.category);
-  if(!cat)cat=channels.find(c=>c?.type===ChannelType.GuildCategory&&c.name===name);
+  const layout=formLayout[kind];
+  const name=layout.category;
+  let cat=selectFormCategory([...channels.values()],kind,old?.category,sameChannelName,c=>c?.type===ChannelType.GuildCategory);
   if(!cat)cat=await g.channels.create({name,type:ChannelType.GuildCategory,permissionOverwrites});
   if(cat.permissionsFor(g.roles.everyone)?.has(PermissionFlagsBits.ViewChannel)!==false)throw Error('Categoria não privada');
+  if(!sameChannelName(cat.name,name))cat=await cat.setName(name,'Padronizar registros RP');
   const ids=[];
-  for(const [field,label] of [['entry','🖥️・registrar'],['published','📄・publicados'],['archived','🔒・arquivados']]){
+  for(const [field,previousLabel] of [['entry','🖥️・registrar'],['published','📄・publicados'],['archived','🔒・arquivados']]){
+   const label=layout[field];
    let ch=old&&channels.get(old[field]);
-   if(!ch)ch=channels.find(c=>c?.type===ChannelType.GuildText&&c.parentId===cat.id&&c.name===label);
-   if(!ch)ch=await g.channels.create({name:label,type:ChannelType.GuildText,parent:cat.id});
-   if(ch.parentId!==cat.id||!privateChannel(g,ch))throw Error('Canal não privado');
+   const named=channels.find(c=>c?.type===ChannelType.GuildText&&c.parentId===cat.id&&sameChannelName(c.name,label));
+   if(ch&&named&&ch.id!==named.id)throw Error('Canais duplicados: '+label);
+   if(!ch)ch=named??channels.find(c=>c?.type===ChannelType.GuildText&&c.parentId===cat.id&&sameChannelName(c.name,previousLabel));
+   if(!ch)ch=await g.channels.create({name:label,type:ChannelType.GuildText,parent:cat.id,permissionOverwrites});
+   if(!privateChannel(g,ch))throw Error('Canal não privado');
+   if(ch.parentId!==cat.id){
+    if(!old||old[field]!==ch.id)throw Error('Canal não reconhecido');
+    ch=await ch.setParent(cat.id,{lockPermissions:false,reason:'Reorganizar registros RP preservando permissões'});
+   }
+   if(ch.parentId!==cat.id||!privateChannel(g,ch))throw Error('Canal não privado após reorganização');
+   if(ch.name!==label)ch=await ch.setName(label,'Padronizar nomes de registros RP');
    ids.push(ch.id);
    if(field==='entry'){
     const recent=await ch.messages.fetch({limit:30});
-    const previous=recent.find(m=>m.author.id===g.client.user.id&&m.embeds[0]?.title===spec.icon+' '+spec.name);
+    const previous=recent.find(m=>m.author.id===g.client.user.id&&[spec.icon+' '+spec.name,layout.oldTitle].includes(m.embeds[0]?.title));
     if(previous)await previous.edit(panel(kind));else await ch.send(panel(kind));
    }
   }
   db.saveFormSection(g.id,kind,cat.id,...ids);
  }
- return edit(i,'Centrais de registros configuradas. Os canais anteriores foram preservados.');
+ return edit(i,'Centrais reorganizadas com nomes específicos. Os registros, canais anteriores e permissões existentes foram preservados.');
  }finally{locks.delete(key);}
 }
 function draftModal(r){

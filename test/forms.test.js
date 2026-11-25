@@ -25,3 +25,17 @@ test('draft publication and archive state are guild scoped',()=>{
  assert.equal(db.formArchive('a',id,'arc','msg2'),true);
  assert.equal(db.formList('a','report').length,0);
 });
+
+test('all twelve permanent channel names differ and categories keep the requested names',async()=>{
+ const {formLayout,selectFormCategory}=await import('../form-model.js');
+ const {sameChannelName}=await import('../deic.js');
+ const labels=Object.values(formLayout).flatMap(x=>[x.entry,x.published,x.archived]);
+ assert.equal(new Set(labels).size,12);
+ assert.match(formLayout.scene.category,/Tocaias RP/);
+ assert.match(formLayout.character.category,/Procurados RP/);
+ const old={id:'old',name:formLayout.scene.oldCategory,type:4};
+ const current={id:'existing',name:'🎯・DEIC | Tocaias RP',type:4};
+ assert.equal(selectFormCategory([old,current],'scene','old',sameChannelName,c=>c.type===4).id,'existing');
+ assert.equal(selectFormCategory([old],'scene','old',sameChannelName,c=>c.type===4).id,'old');
+ assert.throws(()=>selectFormCategory([current,{...current,id:'duplicate'}],'scene','old',sameChannelName,c=>c.type===4));
+});

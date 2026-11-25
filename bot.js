@@ -147,7 +147,7 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.once(Events.ClientReady, async ready => {
-  console.log('Servidor Base conectado como '+ready.user.tag+' | revisão registros-r2 / '+navigationRevision);
+  console.log('Servidor Base conectado como '+ready.user.tag+' | revisão organizacao-r3 / '+navigationRevision);
   for(const guild of ready.guilds.cache.values()){
     const reception=deicModules.deicRecepcao;
     try {

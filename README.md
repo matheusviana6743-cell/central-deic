@@ -59,3 +59,7 @@ Após registrar os comandos, a direção executa `/organizar-registros` para cri
 ### Revisão registros-r2
 
 As imagens novas (PNG, JPEG ou WebP, até 2 MiB) são armazenadas no SQLite existente, com limite de 50 MiB por servidor. São anexadas novamente na prévia, publicação e arquivo; não dependem do link original. O backup SQLite inclui essas imagens. Imagens de rascunhos cancelados são removidas do banco. Links antigos não são recuperados automaticamente. A publicação verifica se o conteúdo ainda corresponde à prévia. Um rascunho aberto por categoria é reaproveitado. O catálogo HTML interno lista até 200 fichas narrativas fictícias ativas, sem fotos, informações de localização de pessoas ou dados externos. O botão Arquivar retira a ficha da lista. A migração histórica e transcript continuam separados da instalação; não exclua os canais antigos antes de revisar os dados.
+
+### Organização r3
+
+`/organizar-registros` usa nomes próprios em cada categoria: Relatórios, Tocaias RP (documentação retrospectiva fictícia), Mesas e Procurados RP (fichas narrativas de personagens fictícios). Reutiliza a categoria original quando reconhecida e move somente os canais de registros identificados no banco, preservando as permissões. Não apaga categorias, mensagens, canais antigos ou mesas individuais. Se encontrar duplicatas ambíguas, interrompe a reorganização para revisão manual.
