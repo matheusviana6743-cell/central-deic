@@ -53,7 +53,7 @@ export function handoff(guild,id,actor,expected,next) {
   });
 }
 
-export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_status WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM wanted_draft WHERE guild=?','DELETE FROM archive WHERE guild=?','DELETE FROM academy_progress WHERE guild=?','DELETE FROM community_checkins WHERE guild=?','DELETE FROM community_ranking WHERE guild=?','DELETE FROM rp_forms WHERE guild=?','DELETE FROM rp_form_sections WHERE guild=?']) db.prepare(q).run(guild); }); }
+export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_status WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM wanted_draft WHERE guild=?','DELETE FROM archive WHERE guild=?','DELETE FROM academy_progress WHERE guild=?','DELETE FROM community_checkins WHERE guild=?','DELETE FROM community_ranking WHERE guild=?','DELETE FROM rp_form_images WHERE guild=?','DELETE FROM rp_forms WHERE guild=?','DELETE FROM rp_form_sections WHERE guild=?']) db.prepare(q).run(guild); }); }
 
 export const timeline = id => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id').iterate(id);
 export function reopen(guild, id, actor, reason) {
@@ -179,3 +179,25 @@ export const formTransition=(guild,id,from,to)=>Boolean(db.prepare('UPDATE rp_fo
 export const formPublish=(guild,id,channel,message)=>Boolean(db.prepare("UPDATE rp_forms SET state='published',published_channel=?,published_message=? WHERE guild=? AND id=? AND state='publishing'").run(channel,message,guild,id).changes);
 export const formArchive=(guild,id,channel,message)=>Boolean(db.prepare("UPDATE rp_forms SET state='archived',archived_channel=?,archived_message=? WHERE guild=? AND id=? AND state='archiving'").run(channel,message,guild,id).changes);
 export const formList=(guild,kind)=>db.prepare("SELECT * FROM rp_forms WHERE guild=? AND kind=? AND state='published' ORDER BY id DESC LIMIT 50").all(guild,kind);
+
+db.exec(`CREATE TABLE IF NOT EXISTS rp_form_images(guild TEXT NOT NULL, record INTEGER NOT NULL, ext TEXT NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(guild,record));`);
+export const formImage=(guild,id)=>db.prepare('SELECT ext,bytes FROM rp_form_images WHERE guild=? AND record=?').get(guild,id);
+export function setFormImage(guild,id,ext,bytes){
+ return transaction(()=>{
+  const r=formGet(guild,id);
+  if(!r||r.state!=='draft'||!['png','jpg','webp'].includes(ext)||!(bytes instanceof Uint8Array)||!bytes.length||bytes.length>2097152)return false;
+  const sum=db.prepare('SELECT coalesce(sum(length(bytes)),0) n FROM rp_form_images WHERE guild=? AND record<>?').get(guild,id).n;
+  if(sum+bytes.length>52428800)return false;
+  db.prepare('INSERT OR REPLACE INTO rp_form_images VALUES(?,?,?,?)').run(guild,id,ext,bytes);
+  return true;
+ });
+}
+export function removeFormImage(guild,id){
+ return transaction(()=>{
+  const r=formGet(guild,id);
+  if(!r||!['draft','cancelled'].includes(r.state))return false;
+  return Boolean(db.prepare('DELETE FROM rp_form_images WHERE guild=? AND record=?').run(guild,id).changes);
+ });
+}
+export const existingFormDraft=(guild,owner,kind)=>db.prepare("SELECT * FROM rp_forms WHERE guild=? AND owner=? AND kind=? AND state='draft' ORDER BY id DESC LIMIT 1").get(guild,owner,kind);
+export const listCharacterForms=guild=>db.prepare("SELECT id,payload FROM rp_forms WHERE guild=? AND kind='character' AND state='published' ORDER BY id DESC LIMIT 200").all(guild);

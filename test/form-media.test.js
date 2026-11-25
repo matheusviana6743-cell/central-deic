@@ -1,0 +1,40 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {imageType,discordImageUrl,previewKey,imageAttachment,downloadGameImage,MAX_IMAGE} from '../form-media.js';
+import {characterCatalog} from '../form-model.js';
+process.env.DEIC_DATABASE=':memory:';
+const db=await import('../records.js');
+const png=Buffer.from([137,80,78,71,13,10,26,10,1]);
+test('image download only accepts limited Discord CDN attachments with verified signatures',async()=>{
+ const url='https://cdn.discordapp.com/attachments/123/456/game.png';
+ assert.equal(discordImageUrl(url),true);
+ for(const bad of ['http://cdn.discordapp.com/attachments/1/2/a','https://cdn.discordapp.com.evil.test/attachments/1/2/a','https://example.com/a','https://cdn.discordapp.com/elsewhere'])assert.equal(discordImageUrl(bad),false);
+ assert.equal(imageType('image/png',png),'png');
+ assert.equal(imageType('image/jpeg',png),null);
+ const photo=await downloadGameImage({url,size:png.length,contentType:'image/png'},async()=>new Response(png));
+ assert.equal(photo.ext,'png');
+ assert.deepEqual(photo.bytes,png);
+ await assert.rejects(downloadGameImage({url,size:MAX_IMAGE+1,contentType:'image/png'},async()=>new Response(png)));
+ assert.equal(imageAttachment(photo).url,'attachment://registro.png');
+});
+test('images persist through publish and archive, isolated by guild',()=>{
+ const id=db.formStart('guild-a','author','report','draft-a');
+ assert.equal(db.existingFormDraft('guild-a','author','report').id,id);
+ assert.equal(db.setFormImage('guild-a',id,'png',png),true);
+ assert.equal(db.formImage('guild-b',id),undefined);
+ const key=previewKey({local:'a'},db.formImage('guild-a',id));
+ assert.notEqual(key,previewKey({local:'b'},db.formImage('guild-a',id)));
+ assert.notEqual(key,previewKey({local:'a'},null));
+ assert.equal(db.formTransition('guild-a',id,'draft','publishing'),true);
+ assert.equal(db.setFormImage('guild-a',id,'png',png),false);
+ assert.equal(db.formPublish('guild-a',id,'pub','msg'),true);
+ assert.equal(db.formTransition('guild-a',id,'published','archiving'),true);
+ assert.equal(db.formArchive('guild-a',id,'arc','msg2'),true);
+ assert.deepEqual(Buffer.from(db.formImage('guild-a',id).bytes),png);
+ db.clearGuild('guild-a');assert.equal(db.formImage('guild-a',id),undefined);
+});
+test('catalog escapes data and includes only fictional narrative fields',()=>{
+ const html=characterCatalog([{id:1,payload:JSON.stringify({name:'<script>',code:'RP-01',description:'fictício',story:'história',photo:'https://example.com/private'})}]);
+ assert.ok(html.includes('&lt;script&gt;'));
+ assert.ok(!html.includes('<script>'));
+ assert.ok(!html.includes('example.com'));
+});

@@ -1,6 +1,7 @@
+import { downloadGameImage,imageAttachment,previewKey } from './form-media.js';
 import { ActionRowBuilder,ButtonBuilder,ButtonStyle,ChannelType,MessageFlags,ModalBuilder,OverwriteType,PermissionFlagsBits,SlashCommandBuilder,TextInputBuilder,TextInputStyle } from 'discord.js';
 import { team } from './deic.js';
-import { formKinds,formPayload,formCard } from './form-model.js';
+import { formKinds,formPayload,formCard,characterCatalog } from './form-model.js';
 import * as db from './records.js';
 const quiet={flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}},mentions={parse:[]};
 const row=(...items)=>new ActionRowBuilder().addComponents(...items);
@@ -17,7 +18,7 @@ export const formCommands=[
 ];
 function panel(kind){
  const spec=formKinds[kind];
- return {allowedMentions:mentions,embeds:[{color:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name,description:'Abra um rascunho privado, preencha o formulário e confira a prévia antes de publicar. Use apenas conteúdo fictício do jogo, sem dados pessoais reais.',footer:{text:'Registro · Publicação · Arquivo'}}],components:[row(btn('start',kind,'Registrar',ButtonStyle.Primary),btn('list',kind,'Lista de registros'))]};
+ return {allowedMentions:mentions,embeds:[{color:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name,description:'Abra um rascunho privado, preencha o formulário e confira a prévia antes de publicar. Use apenas conteúdo fictício do jogo, sem dados pessoais reais.',footer:{text:'Registro · Publicação · Arquivo'}}],components:[row(btn('start',kind,'Registrar',ButtonStyle.Primary),btn('list',kind,'Lista de registros'),...(kind==='character'?[btn('catalog',kind,'Catálogo HTML')]:[]))]};
 }
 async function setup(i){
  if(!chief(i)||!i.memberPermissions?.has(PermissionFlagsBits.ManageGuild))return i.reply({...quiet,content:'A direção administra a estrutura de registros.'});
@@ -64,8 +65,8 @@ function draftModal(r){
  }
  return modal;
 }
-function draftControls(id){return row(btn('fill',id,'Preencher / modificar',ButtonStyle.Primary),btn('preview',id,'Prévia'),btn('cancel',id,'Cancelar',ButtonStyle.Danger));}
-function previewControls(id){return row(btn('publish',id,'Publicar',ButtonStyle.Success),btn('fill',id,'Modificar'),btn('cancel',id,'Cancelar',ButtonStyle.Danger));}
+function draftControls(id){return row(btn('fill',id,'Preencher / modificar',ButtonStyle.Primary),btn('preview',id,'Prévia'),btn('no-photo',id,'Sem foto'),btn('cancel',id,'Cancelar',ButtonStyle.Danger));}
+function previewControls(id,key){return row(btn('publish',id+':'+key,'Publicar',ButtonStyle.Success),btn('fill',id,'Modificar'),btn('cancel',id,'Cancelar',ButtonStyle.Danger));}
 async function target(i,r,field){
  const cfg=db.formSection(i.guildId,r.kind);
  const ch=cfg&&await i.guild.channels.fetch(cfg[field]);
@@ -79,24 +80,38 @@ async function start(i,kind){
  const key='draft:'+i.guildId+':'+i.user.id+':'+kind;if(locks.has(key))return edit(i,'Rascunho em preparação.');locks.add(key);
  try{
  const g=i.guild,bot=await g.members.fetchMe();
+ const pending=db.existingFormDraft(g.id,i.user.id,kind);
+ if(pending){
+  const old=await g.channels.fetch(pending.channel).catch(e=>{if(e.code===10003)return null;throw e;});
+  if(old&&privateChannel(g,old)&&view(old,i.member))return edit(i,'Seu rascunho já está aberto em <#'+old.id+'>.');
+  if(old)return edit(i,'Existe um rascunho anterior. Peça à direção para verificar o acesso.');
+  return edit(i,'Há um rascunho sem canal. A direção deve revisar o registro antes de criar outro.');
+ }
  const visible=[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.ReadMessageHistory,PermissionFlagsBits.SendMessages];
  const ch=await g.channels.create({name:'📝・rascunho-'+kind+'-'+i.user.id.slice(-6),type:ChannelType.GuildText,parent:cfg.category,permissionOverwrites:[{id:g.id,type:OverwriteType.Role,deny:[PermissionFlagsBits.ViewChannel]},{id:i.user.id,type:OverwriteType.Member,allow:visible},{id:bot.id,type:OverwriteType.Member,allow:[...visible,PermissionFlagsBits.ManageChannels]}]});
  const id=db.formStart(g.id,i.user.id,kind,ch.id);
- await ch.send({allowedMentions:mentions,embeds:[{color:0x245589,title:'📝 Rascunho #'+id,description:'Preencha os campos do formulário. Depois, se desejar, use /foto-registro com uma imagem do jogo ou selecione Sem foto / prévia. Revise antes de publicar. Não envie dados ou fotos de pessoas reais.'}],components:[row(btn('fill',id,'Preencher relatório',ButtonStyle.Primary),btn('preview',id,'Sem foto / prévia'),btn('cancel',id,'Cancelar',ButtonStyle.Danger))]});
+ await ch.send({allowedMentions:mentions,embeds:[{color:0x245589,title:'📝 Rascunho #'+id,description:'Preencha os campos do formulário. Use /foto-registro para anexar uma captura fictícia de até 2 MB ou selecione Sem foto / prévia. Revise antes de publicar. Não envie dados ou fotos de pessoas reais.'}],components:[row(btn('fill',id,'Preencher relatório',ButtonStyle.Primary),btn('no-photo',id,'Sem foto / prévia'),btn('cancel',id,'Cancelar',ButtonStyle.Danger))]});
  return edit(i,'Rascunho aberto em <#'+ch.id+'>.');
  }finally{locks.delete(key);}
 }
+function recordMessage(r,payload,status){
+ const photo=imageAttachment(db.formImage(r.guild,r.id));
+ return {embeds:[formCard(r.kind,r.id,{...payload,photo:photo?.url},status)],files:photo?[photo.file]:[],allowedMentions:mentions};
+}
 async function preview(i,r){
  const payload=JSON.parse(r.payload);if(!formPayload(r.kind,payload))return i.reply({...quiet,content:'Preencha primeiro todos os campos.'});
- return i.reply({...quiet,embeds:[formCard(r.kind,r.id,payload)],components:[previewControls(r.id)]});
+ return i.reply({...quiet,...recordMessage(r,payload,'Prévia'),components:[previewControls(r.id,previewKey(payload,db.formImage(r.guild,r.id)))]});
 }
-async function publish(i,r){
+async function publish(i,r,key){
  const payload=JSON.parse(r.payload);if(!formPayload(r.kind,payload))return i.reply({...quiet,content:'Preencha primeiro todos os campos.'});
+ if(key!==previewKey(payload,db.formImage(r.guild,r.id)))return i.reply({...quiet,content:'O rascunho mudou. Abra uma nova prévia antes de publicar.'});
  await i.deferReply(quiet);
+ const current=db.formGet(i.guildId,r.id);
+ if(!current||key!==previewKey(JSON.parse(current.payload),db.formImage(r.guild,r.id)))return edit(i,'O rascunho mudou. Abra uma nova prévia.');
  if(!db.formTransition(i.guildId,r.id,'draft','publishing'))return edit(i,'Registro já processado.');
  try{
  const ch=await target(i,r,'published');
- const message=await ch.send({allowedMentions:mentions,embeds:[formCard(r.kind,r.id,payload,'Publicado')],components:[row(btn('archive',r.id,'Arquivar',ButtonStyle.Secondary))]});
+ const message=await ch.send({...recordMessage(r,payload,'Publicado'),components:[row(btn('archive',r.id,'Arquivar',ButtonStyle.Secondary))]});
  if(!db.formPublish(i.guildId,r.id,ch.id,message.id))throw Error('Estado inesperado após publicar');
  await edit(i,'Registro publicado em <#'+ch.id+'>.');
  await i.channel.delete('Rascunho publicado').catch(()=>{});
@@ -108,7 +123,7 @@ async function archive(i,r){
  if(!db.formTransition(i.guildId,r.id,'published','archiving'))return edit(i,'Registro já processado.');
  try{
  const ch=await target(i,r,'archived'),payload=JSON.parse(r.payload);
- const msg=await ch.send({allowedMentions:mentions,embeds:[formCard(r.kind,r.id,payload,'Arquivado')]});
+ const msg=await ch.send({...recordMessage(r,payload,'Arquivado')});
  if(!db.formArchive(i.guildId,r.id,ch.id,msg.id))throw Error('Estado inesperado');
  await i.channel.messages.delete(r.published_message).catch(async()=>{const old=await i.channel.messages.fetch(r.published_message);await old.edit({embeds:[formCard(r.kind,r.id,payload,'Arquivado')],components:[]});});
  return edit(i,'Registro arquivado em <#'+ch.id+'>.');
@@ -122,18 +137,27 @@ export async function handleForms(i){
  if(i.isChatInputCommand()){
   const r=db.formByChannel(i.guildId,i.channelId),photo=i.options.getAttachment('foto',true);
   if(!r||r.owner!==i.user.id||r.state!=='draft'||!privateChannel(i.guild,i.channel)||!view(i.channel,i.member))return i.reply({...quiet,content:'Use seu próprio canal de rascunho.'});
-  if(!/^image\/(png|jpeg|webp|gif)$/.test(photo.contentType??'')||photo.size>8000000||!/^https:\/\/(cdn|media)\.discordapp\.(com|net)\/attachments\//.test(photo.url))return i.reply({...quiet,content:'Envie uma imagem do jogo de até 8 MB.'});
-  const payload=JSON.parse(r.payload);
-  if(!db.formSave(i.guildId,r.id,{...payload,photo:photo.url}))return i.reply({...quiet,content:'Rascunho indisponível.'});
-  return i.reply({...quiet,content:'Imagem vinculada. Confira a prévia.',components:[draftControls(r.id)]});
+  await i.deferReply(quiet);
+  let media;
+  try{media=await downloadGameImage(photo);}catch{return edit(i,'Envie uma captura fictícia PNG, JPG ou WebP de até 2 MB.');}
+  if(!db.setFormImage(i.guildId,r.id,media.ext,media.bytes))return edit(i,'Rascunho indisponível ou limite de armazenamento do servidor atingido.');
+  return i.editReply({content:'Imagem salva no banco. Confira a prévia.',components:[draftControls(r.id)],allowedMentions:mentions});
  }
- const [,action,value]=i.customId.split(':');
+ const [,action,value,key]=i.customId.split(':');
  if(action==='start')return await start(i,value);
+ if(action==='catalog'&&value==='character'){
+  const cfg=db.formSection(i.guildId,value);
+  if(!cfg||cfg.entry!==i.channelId||!privateChannel(i.guild,i.channel)||!view(i.channel,i.member))return i.reply({...quiet,content:'Use a central autorizada.'});
+  await target(i,{kind:value},'published');
+  const rows=db.listCharacterForms(i.guildId);
+  return i.reply({...quiet,content:'Catálogo interno de fichas narrativas ativas. Até 200 registros recentes, sem imagens ou dados externos.',files:[{attachment:Buffer.from(characterCatalog(rows)),name:'personagens-rp.html'}]});
+ }
  if(action==='list'){
   const cfg=db.formSection(i.guildId,value);
   if(!cfg||cfg.entry!==i.channelId||!privateChannel(i.guild,i.channel)||!view(i.channel,i.member))return i.reply({...quiet,content:'Use a central autorizada.'});
+  await target(i,{kind:value},'published');
   const rows=db.formList(i.guildId,value);
-  return i.reply({...quiet,content:rows.length?rows.map(r=>'#'+r.id+' · https://discord.com/channels/'+i.guildId+'/'+r.published_channel+'/'+r.published_message).join('\n').slice(0,1900):'Nenhum registro publicado.'});
+  return i.reply({...quiet,content:rows.length?rows.map(r=>'#'+r.id+(value==='character'?' · '+String(JSON.parse(r.payload).name??'').replace(/[\r\n]/g,' ').slice(0,70):'')+' · https://discord.com/channels/'+i.guildId+'/'+r.published_channel+'/'+r.published_message).join('\n').slice(0,1900):'Nenhum registro publicado.'});
  }
  if(!/^\d+$/.test(value))return i.reply({...quiet,content:'Registro inválido.'});
  const r=db.formGet(i.guildId,Number(value));
@@ -144,14 +168,18 @@ export async function handleForms(i){
  if(action==='save'&&i.isModalSubmit()){
   const payload=formPayload(r.kind,Object.fromEntries(formKinds[r.kind].fields.map(([key])=>[key,i.fields.getTextInputValue(key)])));
   if(!payload)return i.reply({...quiet,content:'Revise os campos.'});
-  const old=JSON.parse(r.payload);
-  if(!db.formSave(i.guildId,r.id,{...payload,...(old.photo?{photo:old.photo}:{})}))return i.reply({...quiet,content:'Rascunho indisponível.'});
+  if(!db.formSave(i.guildId,r.id,payload))return i.reply({...quiet,content:'Rascunho indisponível.'});
   return i.reply({...quiet,content:'Dados salvos. Envie uma imagem usando /foto-registro ou abra a prévia sem foto.',components:[draftControls(r.id)]});
  }
+ if(action==='no-photo'&&i.isButton()){
+  db.removeFormImage(i.guildId,r.id);
+  return await preview(i,db.formGet(i.guildId,r.id));
+ }
  if(action==='preview')return await preview(i,r);
- if(action==='publish')return await publish(i,r);
+ if(action==='publish')return await publish(i,r,key);
  if(action==='cancel'){
   if(!db.formTransition(i.guildId,r.id,'draft','cancelled'))return i.reply({...quiet,content:'Registro indisponível.'});
+  db.removeFormImage(i.guildId,r.id);
   await i.reply({...quiet,content:'Rascunho cancelado.'});return await i.channel.delete('Rascunho cancelado');
  }
  return i.reply({...quiet,content:'Controle indisponível.'});

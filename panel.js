@@ -171,7 +171,7 @@ async function manageTicket(interaction, action) {
       ViewChannel: true, SendMessages: false, SendMessagesInThreads: false,
       CreatePublicThreads: false, CreatePrivateThreads: false, AddReactions: false,
     }, { type: OverwriteType.Member, reason: 'Ticket DEIC encerrado' });
-    await channel.edit({ topic: stateTopic({ ...state, status: 'encerrado' }), name: `🔒・${channel.name.replace(/^[^\\p{L}\\p{N}]+/u,'').slice(0,85)}` });
+    await channel.edit({ topic: stateTopic({ ...state, status: 'encerrado' }), name: `🔒・${channel.name.replace(/^[^\p{L}\p{N}]+/u,'').slice(0,85)}` });
     if(interaction.message)await interaction.message.edit({ components: [] }).catch(() => {});
     await channel.send({ content: `🔒 Encerrado por <@${user.id}>. O histórico segue disponível para consulta.`, allowedMentions: { parse: [] } });
     await tell(interaction, 'Ticket encerrado.');
