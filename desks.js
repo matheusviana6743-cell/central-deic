@@ -7,8 +7,8 @@ import { panelCard, ticketMenu } from './panel.js';
 const row = (...items) => new ActionRowBuilder().addComponents(...items);
 const button = (id,label,style=ButtonStyle.Secondary) => new ButtonBuilder().setCustomId('rp:'+id).setLabel(label).setStyle(style);
 const quiet = {flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}};
-const sectors = { case: modules.deicInterna, intel: modules.deicIntel, admin: modules.deicComando };
-const labels = {case:'Caso',intel:'Dossiê RP'};
+const sectors = { case: modules.deicInterna, intel: modules.deicIntel, wanted: modules.deicIntel, admin: modules.deicComando };
+const labels = {case:'Caso',intel:'Dossiê RP',wanted:'Procurado RP'};
 const locks = new Set();
 const field = (id,label,max,short=false) => row(new TextInputBuilder().setCustomId(id).setLabel(label).setRequired(true).setMaxLength(max).setStyle(short?TextInputStyle.Short:TextInputStyle.Paragraph));
 const modal = (i,id,title,...fields) => i.showModal(new ModalBuilder().setCustomId('rp:'+id).setTitle(title).addComponents(...fields));
@@ -39,7 +39,7 @@ export function deskCard(kind) {
       : '**Uma central para o trabalho da equipe em Travessia.**\n\n📁 Abra e acompanhe investigações.\n📸 Reúna relatos, prints e clipes no histórico do caso.\n🎙️ Dentro do caso, abra uma mesa ou tocaia e registre o resultado da cena.';
   return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:'DEIC  |  '+title,description,footer:{text:'Polícia Civil • Travessia RP'}}],components:admin?
     [row(button('stats','Produção da equipe',ButtonStyle.Primary),button('queue','Fichas e tickets'),button('access','Acesso à inteligência'),button('archive','Canais antigos'))]:
-    [row(button('new:'+kind,intel?'Cadastrar dossiê':'Abrir caso',ButtonStyle.Primary),button('list:'+kind+':0','Consultar registros'),button('find:'+kind,'Pesquisar'))]};
+    [row(button('new:'+kind,intel?'Cadastrar dossiê':'Abrir caso',ButtonStyle.Primary),button('list:'+kind+':0','Consultar registros'),button('find:'+kind,'Pesquisar')), ...(intel?[row(button('new:wanted','Cadastrar procurado RP'),button('list:wanted:0','Ver procurados RP'),button('find:wanted','Consultar passaporte RP'))]:[])]};
 }
 
 export async function publishDesks(guild, groups) {
@@ -73,6 +73,7 @@ function detail(i,record,page=0) {
   const entries=records.history(record.id,page);
   const stem=record.kind+':'+record.id;
   const controls=[];
+  if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
   if (!record.closed) {
     controls.push(row(button('note:'+stem,'Adicionar relato'),button('evidence:'+stem,'Vincular evidência'),button('finish:'+stem,'Encerrar',ButtonStyle.Danger)));
     if(record.kind==='case') controls.push(row(button('mesa:'+stem,'Abrir mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso')));
@@ -116,15 +117,25 @@ export async function handleDesk(i) {
     (i.user.id===i.guild.ownerId || i.member.roles.cache.some(r=>sector.access.includes(r.name)));
   if(!authorized) return i.reply({...quiet,content:'Este controle pertence ao painel reservado do seu setor.'});
   try {
+    const chief = i.user.id===i.guild.ownerId || i.member.roles.cache.some(r=>team.slice(0,2).includes(r.name));
+    if(action==='reopen' && kind==='case' && chief) return await modal(i,'reopen-save:case:'+arg,'Reabrir caso',field('body','Motivo da reabertura',850));
+    if(action==='new' && kind==='wanted') return await modal(i,'create:wanted','Cadastrar procurado RP',field('passport','Passaporte do personagem RP',16,true),field('title','Nome do personagem RP',55,true),field('body','Resumo ficcional e link de print do jogo',850));
     if(action==='new') return await modal(i,'create:'+kind,'Abrir '+labels[kind],field('title','Título ou nome do personagem RP',80,true),field('body','Resumo da cena e referências do jogo',850));
-    if(action==='find') return await modal(i,'search:'+kind,'Pesquisar registros',field('query','Número, nome ou palavra do histórico',16,true));
+    if(action==='find') return await modal(i,'search:'+kind,'Pesquisar registros',field('query',kind==='wanted'?'Passaporte do personagem RP':'Número, nome ou palavra do histórico',16,true));
     const notes={note:'Relato',evidence:'Evidência',finish:'Encerramento',qrr:'Registro QRR'};
     if(notes[action]) return await modal(i,'save:'+kind+':'+arg+':'+action,notes[action],field('body',action==='evidence'?'Link do print ou clipe e contexto da cena':'Resumo para o histórico',850));
     await i.deferReply(quiet);
     if(action==='create'){
       const title=input(i,'title'), body=input(i,'body');
       if(!title||!body) return await say(i,'Preencha o título e o resumo.');
-      const id=records.create(i.guildId,kind,title,i.user.id,body);
+      let name=title;
+      if(kind==='wanted'){
+        const passport=input(i,'passport');
+        if(!/^\d{1,16}$/.test(passport)) return await say(i,'Informe o passaporte numérico do personagem RP.');
+        if(records.search(i.guildId,kind,passport,0).some(r=>!r.closed)) return await say(i,'Já existe um cadastro ativo para esse passaporte RP.');
+        name=passport+' | '+title;
+      }
+      const id=records.create(i.guildId,kind,name,i.user.id,body);
       return await detail(i,records.get(i.guildId,id));
     }
     if(action==='search') return await listing(i,kind,0,Buffer.from(input(i,'query')).toString('base64url'));
@@ -157,6 +168,23 @@ export async function handleDesk(i) {
     }
     const record=records.get(i.guildId,Number(action==='pick'?i.values[0]:arg));
     if(!record||record.kind!==kind) return await say(i,'Registro indisponível neste setor.');
+    if(action==='reopen-save'){
+      if(!chief || record.kind!=='case') return await say(i,'Apenas a chefia pode reabrir casos.');
+      const reason=input(i,'body');
+      if(!reason || !records.reopen(i.guildId,record.id,i.user.id,reason)) return await say(i,'Informe um motivo para reabrir um caso encerrado.');
+    }
+    if(action==='export' && record.kind==='case'){
+      const header='Caso #'+record.id+' — '+record.title;
+      const lines=[header];
+      let bytes=Buffer.byteLength(header);
+      for(const entry of records.timeline(record.id)){
+        const line='\n'+new Date(entry.stamp*1000).toISOString()+' | '+entry.kind+' | '+entry.actor+'\n'+entry.body;
+        bytes+=Buffer.byteLength(line);
+        if(bytes>7_000_000) return await say(i,'O histórico excede o limite de exportação.');
+        lines.push(line);
+      }
+      return await i.editReply({files:[{attachment:Buffer.from(lines.join('')),name:'caso-'+record.id+'.txt'}]});
+    }
     if(action==='transfer'||action==='handoff'){
       const chief=i.guild.ownerId===i.user.id || i.member.roles.cache.some(r=>team.slice(0,2).includes(r.name));
       if(record.closed||record.kind!=='case'||(!chief && record.author!==i.user.id)) return await say(i,'A passagem de um caso aberto cabe ao responsável ou à chefia.');

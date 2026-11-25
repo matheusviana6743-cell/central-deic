@@ -32,7 +32,7 @@ export function add(guild,id,actor,kind,body) {
   });
 }
 export const history = (id,page) => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id DESC LIMIT 4 OFFSET ?').all(id,page*3);
-export const search = (guild,kind,term,page) => db.prepare(`SELECT * FROM records r WHERE guild=? AND kind=? AND (instr(lower(title),lower(?)) OR CAST(id AS TEXT)=? OR EXISTS(SELECT 1 FROM entries e WHERE e.record=r.id AND instr(lower(e.body),lower(?)))) ORDER BY id DESC LIMIT 11 OFFSET ?`).all(guild,kind,term,term,term,page*10);
+export const search = (guild,kind,term,page) => kind==='wanted' && term ? db.prepare("SELECT * FROM records WHERE guild=? AND kind=? AND substr(title,1,instr(title,' | ')-1)=? ORDER BY closed,id DESC LIMIT 11 OFFSET ?").all(guild,kind,term,page*10) : db.prepare(`SELECT * FROM records r WHERE guild=? AND kind=? AND (instr(lower(title),lower(?)) OR CAST(id AS TEXT)=? OR EXISTS(SELECT 1 FROM entries e WHERE e.record=r.id AND instr(lower(e.body),lower(?)))) ORDER BY id DESC LIMIT 11 OFFSET ?`).all(guild,kind,term,term,term,page*10);
 export const totals = guild => db.prepare('SELECT kind,closed,count(*) n FROM records WHERE guild=? GROUP BY kind,closed').all(guild);
 export const production = guild => db.prepare(`SELECT actor,e.kind,count(*) n FROM entries e JOIN records r ON r.id=e.record WHERE guild=? AND stamp>=unixepoch()-604800 GROUP BY actor,e.kind ORDER BY n DESC,actor LIMIT 20`).all(guild);
 export const saveRoom = (guild,channel,record,kind) => db.prepare('INSERT INTO rooms VALUES(?,?,?,?)').run(guild,channel,record,kind);
@@ -54,3 +54,13 @@ export function handoff(guild,id,actor,expected,next) {
 }
 
 export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
+
+export const timeline = id => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id').iterate(id);
+export function reopen(guild, id, actor, reason) {
+  return transaction(() => {
+    const result = db.prepare("UPDATE records SET closed=0 WHERE guild=? AND id=? AND kind='case' AND closed=1").run(guild,id);
+    if (!result.changes) return false;
+    db.prepare('INSERT INTO entries(record,actor,kind,body) VALUES(?,?,?,?)').run(id,actor,'Reabertura',reason);
+    return true;
+  });
+}
