@@ -4,7 +4,7 @@ import { handlesAcademy, handleAcademy } from './academy.js';
 import { handlesWipe, handleWipe } from './wipe.js';
 import { handleDesk, publishDesks } from './desks.js';
 import { publishGuides } from './guides.js';
-import { deicModules } from './deic.js';
+import { deicModules, matchesSectorChannel } from './deic.js';
 import { handlesPanel, handlePanel } from './panel.js';
 import { handlesIntake, handleIntake } from './intake.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits, StringSelectMenuBuilder } from 'discord.js';
@@ -146,8 +146,9 @@ client.once(Events.ClientReady, async ready => {
   console.log('Servidor Base conectado como '+ready.user.tag);
   for(const guild of ready.guilds.cache.values()){
     const reception=deicModules.deicRecepcao;
-    if(!guild.channels.cache.some(c=>c.name===reception.channels[0] && c.parent?.name===reception.name)) continue;
     try {
+      const channels=await guild.channels.fetch();
+      if(!channels.some(c=>matchesSectorChannel(c,reception,reception.channels[0]))) continue;
       await publishDesks(guild, Object.values(deicModules));
       await publishGuides(guild, Object.values(deicModules));
     }

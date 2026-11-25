@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { deicModules, team, intelligence } from './deic.js';
+import { deicModules, team, intelligence, matchesSectorChannel } from './deic.js';
 const options = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 const teamRoles=new Set([...team,intelligence]);
 export const navigationCommand=new SlashCommandBuilder().setName('central').setDescription('Abra sua central de navegação da DEIC RP');
@@ -19,7 +19,7 @@ export async function handleNavigation(i){
     const channels=await i.guild.channels.fetch();
     const fields=[];
     for(const section of Object.values(deicModules)){
-      const visible=section.channels.map(name=>channels.find(c=>c?.type===ChannelType.GuildText&&c.name===name&&c.parent?.name===section.name&&c.permissionsFor(i.member)?.has('ViewChannel'))).filter(Boolean);
+      const visible=section.channels.map(name=>channels.find(c=>c?.type===ChannelType.GuildText&&matchesSectorChannel(c,section,name)&&c.permissionsFor(i.member)?.has('ViewChannel'))).filter(Boolean);
       if(visible.length)fields.push({name:section.name,value:visible.map(c=>'<#'+c.id+'>').join(' · ')});
     }
     const isTeam=i.member.roles.cache.some(r=>teamRoles.has(r.name));

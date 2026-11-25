@@ -1,6 +1,6 @@
 import { academyRow, participationRow } from './navigation.js';
 import { ChannelType } from 'discord.js';
-import { deicModules } from './deic.js';
+import { deicModules, matchesSectorChannel } from './deic.js';
 import { panelId, savePanel } from './records.js';
 
 const cards = [
@@ -29,8 +29,8 @@ export async function publishGuides(guild, groups) {
     const section = deicModules[key];
     if (!groups.some(group => group.name === section.name)) continue;
     const channel = channels.find(candidate => candidate?.type === ChannelType.GuildText
-      && candidate.name === section.channels[index] && candidate.parent?.name === section.name);
-    if (!channel) continue;
+      && matchesSectorChannel(candidate,section,section.channels[index]));
+    if (!channel || (section.access && channel.permissionsFor(guild.roles.everyone)?.has('ViewChannel')!==false)) continue;
 
     const card = {
       embeds: [{ color: 0x204c64, author: { name: 'POLÍCIA CIVIL  •  TRAVESSIA RP' }, title,

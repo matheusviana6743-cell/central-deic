@@ -13,3 +13,24 @@ export const deicModules = {
 };
 export const deicPreset = { name: 'DEIC • Travessia RP', themed: true, modules: Object.keys(deicModules) };
 
+
+
+/** Match an explicitly configured name, ignoring decorative leading emoji and separators. */
+export function channelNameKey(name) {
+  return typeof name==='string' ? name.normalize('NFC').replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s+/g,' ').trim().toLowerCase() : '';
+}
+export function sameChannelName(actual, expected) {
+  const key=channelNameKey(expected);
+  return Boolean(key && channelNameKey(actual)===key);
+}
+const separateSections=Object.freeze({
+  'painel-de-mesas':'DEIC | Mesas',
+  'painel-de-tocaias':'DEIC | Tocaias RP',
+  'painel-de-relatorios':'DEIC | Relatórios',
+});
+export function matchesSectorChannel(channel, sector, name) {
+  if (!channel || !sameChannelName(channel.name,name)) return false;
+  if (sameChannelName(channel.parent?.name,sector.name)) return true;
+  const legacy=separateSections[channelNameKey(name)];
+  return Boolean(sector===deicModules.deicInterna && legacy && sameChannelName(channel.parent?.name,legacy));
+}

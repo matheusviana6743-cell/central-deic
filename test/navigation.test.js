@@ -53,3 +53,15 @@ test('team navigation never repeats component IDs across rows',async()=>{
   assert.deepEqual(ids,['community:perfil','community:presenca','community:ranking','academy:menu']);
   assert.equal(academyRow().toJSON().components.length,2);
 });
+
+test('channel names tolerate decoration but preserve explicit sector boundaries',async()=>{
+  const {sameChannelName,matchesSectorChannel}=await import('../deic.js');
+  const internal=deicModules.deicInterna;
+  assert.ok(sameChannelName('📋・central-de-plantao', '📝・central-de-plantao'));
+  assert.ok(matchesSectorChannel({name:'🧩・painel-de-mesas',parent:{name:'🧩・DEIC | Mesas'}},internal,internal.channels[2]));
+  assert.ok(matchesSectorChannel({name:'📝・painel-de-relatorios',parent:{name:'📝・DEIC | Relatórios'}},internal,internal.channels[3]));
+  assert.ok(matchesSectorChannel({name:'🎯・painel-de-tocaias',parent:{name:'🎯・DEIC | Tocaias RP'}},internal,internal.channels[1]));
+  assert.equal(matchesSectorChannel({name:'🧩・painel-de-mesas',parent:{name:'DEIC | Gabinete'}},internal,internal.channels[2]),false);
+  assert.equal(matchesSectorChannel({name:'🧩・painel-de-mesas-falso',parent:{name:'DEIC | Mesas'}},internal,internal.channels[2]),false);
+  assert.equal(matchesSectorChannel({name:'painel-da-direcao',parent:{name:'DEIC | Mesas'}},deicModules.deicComando,deicModules.deicComando.channels[0]),false);
+});

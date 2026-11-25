@@ -4,7 +4,7 @@ import {
   OverwriteType, PermissionFlagsBits, SlashCommandBuilder, StringSelectMenuBuilder,
   TextInputBuilder, TextInputStyle, UserSelectMenuBuilder,
 } from 'discord.js';
-import { deicModules, team } from './deic.js';
+import { deicModules, team, sameChannelName, matchesSectorChannel } from './deic.js';
 import { applyPlan } from './setup.js';
 import { intakeChannel, submitIntake } from './intake.js';
 
@@ -37,8 +37,7 @@ export function handlesPanel(interaction) {
 }
 
 function isPanelRoom(channel) {
-  return channel?.type === ChannelType.GuildText && channel.name === central
-    && channel.parent?.name === deicModules.deicRecepcao.name;
+  return channel?.type === ChannelType.GuildText && matchesSectorChannel(channel,deicModules.deicRecepcao,central);
 }
 
 export function ticketMenu() {
@@ -74,7 +73,7 @@ async function publish(interaction) {
 }
 
 function ticketState(channel) {
-  if (channel?.type !== ChannelType.GuildText || channel.parent?.name !== ticketCategory) return null;
+  if (channel?.type !== ChannelType.GuildText || !sameChannelName(channel.parent?.name,ticketCategory)) return null;
   const match = /^deic-ticket\|(\d+)\|(suporte|ocorrencia|recrutamento|direcao|consulta)\|(aberto|encerrado)\|(\d+|-)\|?$/.exec(channel.topic ?? '');
   return match && { owner: match[1], kind: match[2], status: match[3], agent: match[4] };
 }
@@ -96,7 +95,7 @@ async function openTicket(interaction, kind) {
       return state?.owner === user.id && state.status === 'aberto';
     });
     if (previous) return await tell(interaction, `Seu ticket aberto está em <#${previous.id}>.`);
-    const category = channels.find(channel => channel?.type === ChannelType.GuildCategory && channel.name === ticketCategory);
+    const category = channels.find(channel => channel?.type === ChannelType.GuildCategory && sameChannelName(channel.name,ticketCategory));
     const staffNames = kind === 'direcao' ? agents.slice(0, 2) : agents;
     const staff = roles.filter(role => staffNames.includes(role.name) && !role.managed);
     if (!category || !staff.size || new Set(staff.map(role => role.name)).size !== staff.size) {
@@ -188,7 +187,7 @@ export async function handlePanel(interaction) {
     if (interaction.isChatInputCommand()) return await publish(interaction);
     const [, action, recruiter] = interaction.customId.split(':');
     if (action === 'claim' || action === 'close') return await manageTicket(interaction, action);
-    if(action==='ticket' && interaction.isStringSelectMenu() && interaction.channel?.parent?.name===ticketCategory && interaction.channel?.name==='🎫・abrir-ticket') return await openTicket(interaction,interaction.values[0]);
+    if(action==='ticket' && interaction.isStringSelectMenu() && matchesSectorChannel(interaction.channel,deicModules.deicTickets,'🎫・abrir-ticket')) return await openTicket(interaction,interaction.values[0]);
     if (!isPanelRoom(interaction.channel)) return await tell(interaction, 'Use o painel da recepção.');
     if(action==='configure' && interaction.isButton()){
       if(!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return await tell(interaction,'Disponível para quem gerencia o servidor.');
