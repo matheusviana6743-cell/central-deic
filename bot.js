@@ -1,3 +1,4 @@
+import { handlesMesaPanel, handleMesaPanel, publishExistingMesaPanels } from './mesa-panel.js';
 import { handlesNavigation, handleNavigation, navigationRevision } from './navigation.js';
 import { handlesParticipation, handleParticipation } from './participation.js';
 import { handlesAcademy, handleAcademy } from './academy.js';
@@ -56,6 +57,7 @@ function preview(id, session) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (handlesMesaPanel(interaction)) return handleMesaPanel(interaction);
   if (handlesNavigation(interaction)) return handleNavigation(interaction);
   if (handlesParticipation(interaction)) return handleParticipation(interaction);
   if (handlesAcademy(interaction)) return handleAcademy(interaction);
@@ -147,6 +149,7 @@ client.once(Events.ClientReady, async ready => {
   for(const guild of ready.guilds.cache.values()){
     const reception=deicModules.deicRecepcao;
     try {
+      await publishExistingMesaPanels(guild);
       const channels=await guild.channels.fetch();
       if(!channels.some(c=>matchesSectorChannel(c,reception,reception.channels[0]))) { console.log('Painéis: recepção não reconhecida no servidor '+guild.id); continue; }
       console.log('Painéis: recepção reconhecida; atualizando mensagens existentes no servidor '+guild.id);

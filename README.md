@@ -47,3 +47,7 @@ Não há coleta de mensagens, voz ou atividades fora desses comandos. Os registr
 - Os painéis de formação e escala incluem botões de acesso rápido.
 - `public/index.html`: guia web estático do RP, sem acesso ao banco privado.
 - [Checklist de publicação](RELEASE.md): backup, testes, atualização da aplicação existente e rollback.
+
+## Painel individual da mesa RP
+
+Cada mesa de texto registrada recebe nome `📁・mesa-0005-titulo`, quatro tópicos de documentação e um painel com **Gerenciar integrantes** e **Fechar mesa**. O responsável ou chefia pode atualizar a lista de integrantes. Essa lista não concede nem revoga cargos ou acesso ao canal. O encerramento exige confirmação, registra o desfecho e tenta bloquear e arquivar os tópicos ativos reconhecidos; mensagens e canal permanecem. Os acessos do canal são preservados. Na inicialização, o bot tenta atualizar painéis e nomes das mesas registradas anteriormente, sem recriar canais.

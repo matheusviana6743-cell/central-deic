@@ -158,3 +158,5 @@ export function communityRanking(guild,stamp=Math.floor(Date.now()/1000)) {
     GROUP BY p.member ORDER BY points DESC, p.member ASC LIMIT 10
   `).all(guild,start,stamp,guild,start,stamp,guild);
 }
+
+export const mesaRooms = guild => db.prepare("SELECT rooms.channel,rooms.record FROM rooms JOIN records ON records.id=rooms.record AND records.guild=rooms.guild WHERE rooms.guild=? AND rooms.kind='legacy-mesa' AND records.kind='case' ORDER BY records.id DESC").all(guild);

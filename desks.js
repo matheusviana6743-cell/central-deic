@@ -1,3 +1,4 @@
+import { mesaName, mesaTopics, publishMesaPanel } from './mesa-panel.js';
 import { migrate } from './archive.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, MessageFlags, ModalBuilder, PermissionFlagsBits, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, UserSelectMenuBuilder } from 'discord.js';
 import { deicModules as modules, team, intelligence, matchesSectorChannel } from './deic.js';
@@ -157,9 +158,10 @@ export async function handleDesk(i) {
         const channel=await i.guild.channels.create({type:ChannelType.GuildText,parent:parent.id,name:'mesa-'+slug});
         const id=records.create(i.guildId,kind,name,i.user.id,body);
         records.saveRoom(i.guildId,channel.id,id,'legacy-mesa');
-        await channel.send({allowedMentions:{parse:[]},embeds:[{color,title:'📂 Mesa investigativa · '+title,description:'Responsável: <@'+i.user.id+'>\nCaso #'+id+'\n\nUse os tópicos abaixo para organizar os registros do jogo.'}]});
+        await channel.setName(mesaName(id,title)).catch(e=>console.warn('Nome da mesa não atualizado',e.code??e.name));
+        await publishMesaPanel(i.guild,channel,records.get(i.guildId,id));
         const failed=[];
-        for(const topic of ['Informações','Fotos do RP','Documentos','Relatórios']){
+        for(const topic of mesaTopics){
           try { await channel.threads.create({name:topic,type:ChannelType.PublicThread}); }
           catch { failed.push(topic); }
         }
