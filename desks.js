@@ -19,11 +19,11 @@ const color = 0x204c64;
 export function deskCard(kind) {
   if (kind==='public') return panelCard();
   const activities = {
-    tocaia: ['🎯  Tocaia RP','Organize a cena na cidade. Abra o caso relacionado e use **Abrir tocaia** para criar a sala de voz. Depois, registre o resultado no histórico.'],
-    mesa: ['🧩  Mesa de investigação','Reúna a equipe para analisar a cena. Abra o caso e escolha **Abrir mesa** para criar a sala de voz e guardar as decisões no histórico.'],
+    tocaia: ['🎯  Tocaia RP','Clique em **Abrir tocaia RP** para cadastrar a cena como um caso novo. Na ficha, use **Abrir tocaia** para criar a sala de voz do jogo. Para usar um caso existente, clique em **Selecionar caso**.'],
+    mesa: ['🧩  Mesa de investigação','Clique em **Abrir mesa** para cadastrar um caso novo. Na ficha do caso, use **Canal da mesa** para criar o tópico privado ou **Voz da mesa** para abrir uma sala de voz.'],
     relatorio: ['📝  Relatórios de RP','Registre o trabalho realizado em um caso. Consulte a investigação e use **Adicionar relato**, **Vincular evidência** ou **Registrar QRR**.'],
   };
-  if (activities[kind]) return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:activities[kind][0],description:activities[kind][1],footer:{text:'DEIC  •  Central de plantão'}}],components:[row(button('list:case:0','Selecionar caso',ButtonStyle.Primary),button('find:case','Pesquisar caso'),button('mine:case:0','Minhas mesas'))]};
+  if (activities[kind]) return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:activities[kind][0],description:activities[kind][1],footer:{text:'DEIC  •  Central de plantão'}}],components:[row(button(kind==='mesa'||kind==='tocaia'?'start-'+kind+':case':'new:case', {mesa:'Abrir mesa',tocaia:'Abrir tocaia RP',relatorio:'Abrir caso'}[kind],ButtonStyle.Primary),button('list:case:0','Selecionar caso'),button('find:case','Pesquisar caso'),button('mine:case:0','Minhas mesas'))]};
   if (kind==='ticket') {
     const card = panelCard();
     card.embeds = [{color, author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'}, title:'🎫  Central de Atendimento', description:'**Como podemos ajudar?**\n\nEscolha o assunto no menu abaixo. Um canal reservado será aberto para você conversar com a equipe da DEIC.\n\nTenha em mãos as informações do personagem e os registros da cena, caso sejam necessários.', footer:{text:'DEIC  •  Atendimento e acompanhamento'}}];
@@ -78,7 +78,7 @@ function detail(i,record,page=0) {
     controls.push(row(button('note:'+stem,'Adicionar relato'),button('evidence:'+stem,'Vincular evidência'),button('finish:'+stem,'Encerrar',ButtonStyle.Danger)));
     if(record.kind==='case') controls.push(row(button('discussion:'+stem,'Canal da mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso'),button('crew:'+stem,'Equipe')));
   }
-  if(records.roomList(i.guildId,record.id).length) controls.push(row(button('release:'+stem,'Finalizar salas vazias')));
+  if(records.roomList(i.guildId,record.id).some(room=>room.kind!=='discussion')) controls.push(row(button('release:'+stem,'Finalizar salas vazias')));
   const nav=[];
   if(page) nav.push(button('view:'+stem+':'+(page-1),'Mais recentes'));
   if(entries.length>3) nav.push(button('view:'+stem+':'+(page+1),'Mais antigas'));
@@ -127,6 +127,7 @@ export async function handleDesk(i) {
   try {
     const chief = i.user.id===i.guild.ownerId || i.member.roles.cache.some(r=>team.slice(0,2).includes(r.name));
     if(action==='reopen' && kind==='case' && chief) return await modal(i,'reopen-save:case:'+arg,'Reabrir caso',field('body','Motivo da reabertura',850));
+    if(['start-mesa','start-tocaia'].includes(action) && kind==='case') return await modal(i,'create:case:0:'+action,action==='start-mesa'?'Abrir mesa':'Abrir tocaia RP',field('title','Título da cena de Travessia RP',80,true),field('body','Resumo da cena no jogo',850));
     if(action==='new' && kind==='wanted') return await modal(i,'create:wanted','Cadastrar procurado RP',field('passport','Passaporte do personagem RP',16,true),field('title','Nome do personagem RP',55,true),field('body','Resumo ficcional e link de print do jogo',850));
     if(action==='new') return await modal(i,'create:'+kind,'Abrir '+labels[kind],field('title','Título ou nome do personagem RP',80,true),field('body','Resumo da cena e referências do jogo',850));
     if(action==='find') return await modal(i,'search:'+kind,'Pesquisar registros',field('query',kind==='wanted'?'Passaporte do personagem RP':'Número, nome ou palavra do histórico',16,true));
@@ -146,6 +147,7 @@ export async function handleDesk(i) {
         return await i.editReply({content:'**Rascunho de procurado RP**\n'+name+'\n'+body,allowedMentions:{parse:[]},components:[row(button('publish:wanted:'+draft,'Publicar ficha',ButtonStyle.Success),button('discard:wanted:'+draft,'Descartar'))]});
       }
       const id=records.create(i.guildId,kind,name,i.user.id,body);
+      if(extra==='start-tocaia' && kind==='case') return await sessionRoom(i,records.get(i.guildId,id),'tocaia');
       return await detail(i,records.get(i.guildId,id));
     }
     if(kind==='wanted' && action==='publish'){
