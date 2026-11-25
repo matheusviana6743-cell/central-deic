@@ -53,7 +53,7 @@ export function handoff(guild,id,actor,expected,next) {
   });
 }
 
-export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
+export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_status WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM wanted_draft WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
 
 export const timeline = id => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id').iterate(id);
 export function reopen(guild, id, actor, reason) {
@@ -79,3 +79,33 @@ export function changeCaseMember(guild,id,actor,member,include) {
 }
 
 export const activeWanted = guild => db.prepare("SELECT r.id,r.title,e.body FROM records r JOIN entries e ON e.id=(SELECT min(id) FROM entries WHERE record=r.id) WHERE r.guild=? AND r.kind='wanted' AND r.closed=0 ORDER BY r.id DESC LIMIT 501").all(guild);
+
+db.exec('CREATE TABLE IF NOT EXISTS case_status (record INTEGER PRIMARY KEY, status TEXT NOT NULL)');
+export const caseStatus = id => db.prepare('SELECT status FROM case_status WHERE record=?').get(id)?.status;
+export const myCases = (guild,user,page) => db.prepare("SELECT * FROM records WHERE guild=? AND kind='case' AND (author=? OR EXISTS (SELECT 1 FROM case_members WHERE record=records.id AND member=?)) ORDER BY closed,id DESC LIMIT 11 OFFSET ?").all(guild,user,user,page*10);
+export function changeStatus(guild,id,actor,status) {
+  return transaction(() => {
+    const entry=get(guild,id);
+    if(!entry || entry.kind!=='case' || entry.closed || caseStatus(id)===status) return false;
+    db.prepare('INSERT OR REPLACE INTO case_status VALUES (?,?)').run(id,status);
+    db.prepare('INSERT INTO entries(record,actor,kind,body) VALUES (?,?,?,?)').run(id,actor,'Status da mesa',status);
+    return true;
+  });
+}
+
+db.exec('CREATE TABLE IF NOT EXISTS wanted_draft (id INTEGER PRIMARY KEY, guild TEXT, actor TEXT, title TEXT, body TEXT, stamp INTEGER DEFAULT (unixepoch()))');
+export function draftWanted(guild,actor,title,body){
+  db.prepare('DELETE FROM wanted_draft WHERE stamp < unixepoch()-86400 OR (guild=? AND actor=?)').run(guild,actor);
+  return Number(db.prepare('INSERT INTO wanted_draft(guild,actor,title,body) VALUES(?,?,?,?)').run(guild,actor,title,body).lastInsertRowid);
+}
+export const discardWanted = (guild,actor,id) => db.prepare('DELETE FROM wanted_draft WHERE guild=? AND actor=? AND id=?').run(guild,actor,id);
+export function publishWanted(guild,actor,id){
+  return transaction(()=>{
+    const draft=db.prepare('SELECT * FROM wanted_draft WHERE guild=? AND actor=? AND id=? AND stamp>=unixepoch()-86400').get(guild,actor,id);
+    if(!draft || search(guild,'wanted',draft.title.split(' | ')[0],0).some(record=>!record.closed)) return null;
+    const record=Number(db.prepare('INSERT INTO records(guild,kind,title,author) VALUES(?,?,?,?)').run(guild,'wanted',draft.title,actor).lastInsertRowid);
+    db.prepare('INSERT INTO entries(record,actor,kind,body) VALUES(?,?,?,?)').run(record,actor,'Abertura',draft.body);
+    discardWanted(guild,actor,id);
+    return record;
+  });
+}

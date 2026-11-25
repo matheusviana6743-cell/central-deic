@@ -23,7 +23,7 @@ export function deskCard(kind) {
     mesa: ['🧩  Mesa de investigação','Reúna a equipe para analisar a cena. Abra o caso e escolha **Abrir mesa** para criar a sala de voz e guardar as decisões no histórico.'],
     relatorio: ['📝  Relatórios de RP','Registre o trabalho realizado em um caso. Consulte a investigação e use **Adicionar relato**, **Vincular evidência** ou **Registrar QRR**.'],
   };
-  if (activities[kind]) return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:activities[kind][0],description:activities[kind][1],footer:{text:'DEIC  •  Central de plantão'}}],components:[row(button('list:case:0','Selecionar caso',ButtonStyle.Primary),button('find:case','Pesquisar caso'))]};
+  if (activities[kind]) return {embeds:[{color,author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'},title:activities[kind][0],description:activities[kind][1],footer:{text:'DEIC  •  Central de plantão'}}],components:[row(button('list:case:0','Selecionar caso',ButtonStyle.Primary),button('find:case','Pesquisar caso'),button('mine:case:0','Minhas mesas'))]};
   if (kind==='ticket') {
     const card = panelCard();
     card.embeds = [{color, author:{name:'POLÍCIA CIVIL  •  TRAVESSIA RP'}, title:'🎫  Central de Atendimento', description:'**Como podemos ajudar?**\n\nEscolha o assunto no menu abaixo. Um canal reservado será aberto para você conversar com a equipe da DEIC.\n\nTenha em mãos as informações do personagem e os registros da cena, caso sejam necessários.', footer:{text:'DEIC  •  Atendimento e acompanhamento'}}];
@@ -58,22 +58,22 @@ export async function publishDesks(guild, groups) {
   }
 }
 
-function listing(i,kind,page,encoded='') {
+function listing(i,kind,page,encoded='',mine=false) {
   const term=Buffer.from(encoded,'base64url').toString();
-  const results=records.search(i.guildId,kind,term,page);
+  const results=mine?records.myCases(i.guildId,i.user.id,page):records.search(i.guildId,kind,term,page);
   if (!results.length) return say(i,'Nenhum registro encontrado.');
   const menu=new StringSelectMenuBuilder().setCustomId('rp:pick:'+kind).setPlaceholder('Abrir registro').addOptions(results.slice(0,10).map(r=>({label:('#'+r.id+' · '+r.title).slice(0,100),value:String(r.id),description:r.closed?'Encerrado':'Em andamento'})));
   const navigation=[];
-  if(page) navigation.push(button(['list',kind,page-1,encoded].join(':'),'Anterior'));
-  if(results.length>10) navigation.push(button(['list',kind,page+1,encoded].join(':'),'Próxima'));
-  return i.editReply({content:'**'+(term?'Resultado da pesquisa':'Registros do setor')+'**',components:[row(menu),...(navigation.length?[row(...navigation)]:[])]});
+  if(page) navigation.push(button([mine?'mine':'list',kind,page-1,encoded].join(':'),'Anterior'));
+  if(results.length>10) navigation.push(button([mine?'mine':'list',kind,page+1,encoded].join(':'),'Próxima'));
+  return i.editReply({content:'**'+(mine?'Minhas mesas':term?'Resultado da pesquisa':'Registros do setor')+'**',components:[row(menu),...(navigation.length?[row(...navigation)]:[])]});
 }
 
 function detail(i,record,page=0) {
   const entries=records.history(record.id,page);
   const stem=record.kind+':'+record.id;
   const controls=[];
-  if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(!record.closed?[button('mesa:'+stem,'Voz da mesa')]:[]),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
+  if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(!record.closed?[button('mesa:'+stem,'Voz da mesa'),button('stage:'+stem,'Status da mesa')]:[]),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
   if (!record.closed) {
     controls.push(row(button('note:'+stem,'Adicionar relato'),button('evidence:'+stem,'Vincular evidência'),button('finish:'+stem,'Encerrar',ButtonStyle.Danger)));
     if(record.kind==='case') controls.push(row(button('discussion:'+stem,'Canal da mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso'),button('crew:'+stem,'Equipe')));
@@ -84,7 +84,7 @@ function detail(i,record,page=0) {
   if(entries.length>3) nav.push(button('view:'+stem+':'+(page+1),'Mais antigas'));
   if(nav.length) controls.push(row(...nav));
   return i.editReply({allowedMentions:{parse:[]},embeds:[{color,title:labels[record.kind]+' #'+record.id+' · '+record.title,
-    description:(record.closed?'Encerrado':'Em andamento')+' • Responsável <@'+record.author+'>',
+    description:(record.closed?'Encerrado':records.caseStatus(record.id)||'Em andamento')+' • Responsável <@'+record.author+'>',
     fields:entries.slice(0,3).map(e=>({name:e.kind,value:'<@'+e.actor+'> · <t:'+e.stamp+':f>\n'+e.body}))}],components:controls});
 }
 
@@ -142,9 +142,20 @@ export async function handleDesk(i) {
         if(!/^\d{1,16}$/.test(passport)) return await say(i,'Informe o passaporte numérico do personagem RP.');
         if(records.search(i.guildId,kind,passport,0).some(r=>!r.closed)) return await say(i,'Já existe um cadastro ativo para esse passaporte RP.');
         name=passport+' | '+title;
+        const draft=records.draftWanted(i.guildId,i.user.id,name,body);
+        return await i.editReply({content:'**Rascunho de procurado RP**\n'+name+'\n'+body,allowedMentions:{parse:[]},components:[row(button('publish:wanted:'+draft,'Publicar ficha',ButtonStyle.Success),button('discard:wanted:'+draft,'Descartar'))]});
       }
       const id=records.create(i.guildId,kind,name,i.user.id,body);
       return await detail(i,records.get(i.guildId,id));
+    }
+    if(kind==='wanted' && action==='publish'){
+      const id=records.publishWanted(i.guildId,i.user.id,Number(arg));
+      if(!id) return await say(i,'Rascunho expirado ou passaporte já cadastrado.');
+      return await detail(i,records.get(i.guildId,id));
+    }
+    if(kind==='wanted' && action==='discard'){
+      records.discardWanted(i.guildId,i.user.id,Number(arg));
+      return await say(i,'Rascunho descartado.');
     }
     if(action==='catalog' && kind==='wanted'){
       const active=records.activeWanted(i.guildId);
@@ -158,6 +169,7 @@ export async function handleDesk(i) {
       return await i.editReply({content:'Catálogo interno de personagens de Travessia RP.',files:[{attachment:Buffer.from(html),name:'procurados-travessia.html'}]});
     }
     if(action==='search') return await listing(i,kind,0,Buffer.from(input(i,'query')).toString('base64url'));
+    if(action==='mine') return await listing(i,'case',Number(arg),'',true);
     if(action==='list') return await listing(i,kind,Number(arg),extra);
     if(['archive','hide','restore'].includes(action)){
       if(!i.memberPermissions?.has(PermissionFlagsBits.Administrator)) return await say(i,'Somente o administrador do servidor pode arquivar e restaurar canais.');
@@ -187,6 +199,14 @@ export async function handleDesk(i) {
     }
     const record=records.get(i.guildId,Number(action==='pick'?i.values[0]:arg));
     if(!record||record.kind!==kind) return await say(i,'Registro indisponível neste setor.');
+    if(action==='stage'||action==='stage-save'){
+      if(record.kind!=='case'||record.closed||(!chief && record.author!==i.user.id)) return await say(i,'Somente a chefia ou o responsável pode mudar o status de uma mesa aberta.');
+      const stages=['Em andamento','Aguardando resposta','Em revisão'];
+      if(action==='stage') return await i.editReply({content:'Selecione o status da mesa.',components:[row(new StringSelectMenuBuilder().setCustomId('rp:stage-save:case:'+record.id).addOptions(stages.map(label=>({label,value:label})) ))]});
+      if(!stages.includes(i.values?.[0])) return await say(i,'Selecione um status válido.');
+      records.changeStatus(i.guildId,record.id,i.user.id,i.values[0]);
+      return await detail(i,records.get(i.guildId,record.id));
+    }
     if(action==='discussion'){
       if(record.kind!=='case' || record.closed || (!chief && record.author!==i.user.id && !records.caseMembers(record.id).some(x=>x.member===i.user.id))) return await say(i,'A mesa está disponível para a equipe designada e a chefia.');
       const key='discussion:'+i.guildId+':'+record.id;
