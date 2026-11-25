@@ -13,6 +13,7 @@ const ticketCategory = '🎫・DEIC | Atendimento';
 const privateReply = { flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } };
 const agents = team.slice(0, 4);
 const ticketTypes = {
+  consulta: { label: 'Consulta de personagem RP', icon: '🔎' },
   suporte: { label: 'Suporte e dúvidas', icon: '💬' },
   ocorrencia: { label: 'Ocorrência RP', icon: '📋' },
   recrutamento: { label: 'Recrutamento e tag', icon: '🪪' },
@@ -73,7 +74,7 @@ async function publish(interaction) {
 
 function ticketState(channel) {
   if (channel?.type !== ChannelType.GuildText || channel.parent?.name !== ticketCategory) return null;
-  const match = /^deic-ticket\|(\d+)\|(suporte|ocorrencia|recrutamento|direcao)\|(aberto|encerrado)\|(\d+|-)\|?$/.exec(channel.topic ?? '');
+  const match = /^deic-ticket\|(\d+)\|(suporte|ocorrencia|recrutamento|direcao|consulta)\|(aberto|encerrado)\|(\d+|-)\|?$/.exec(channel.topic ?? '');
   return match && { owner: match[1], kind: match[2], status: match[3], agent: match[4] };
 }
 
@@ -122,7 +123,7 @@ async function openTicket(interaction, kind) {
         allowedMentions: { parse: [] },
         embeds: [{
           color: 0x263e61, title: `🎫 ${ticketTypes[kind].label}`,
-          description: `Solicitante <@${user.id}>\nProtocolo \`${channel.id}\`\n\nDescreva o assunto e inclua links ou prints da cidade RP, se forem necessários.`,
+          description: `Solicitante <@${user.id}>\nProtocolo \`${channel.id}\`\n\n${kind === 'consulta' ? 'Informe o passaporte do personagem de Travessia RP. A equipe consulta o Arquivo de Inteligência e responde neste canal.' : 'Descreva o assunto e inclua links ou prints da cidade RP, se forem necessários.'}`,
         }],
         components: [ticketButtons()],
       });

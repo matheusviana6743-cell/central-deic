@@ -53,7 +53,7 @@ export function handoff(guild,id,actor,expected,next) {
   });
 }
 
-export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
+export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
 
 export const timeline = id => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id').iterate(id);
 export function reopen(guild, id, actor, reason) {
@@ -61,6 +61,19 @@ export function reopen(guild, id, actor, reason) {
     const result = db.prepare("UPDATE records SET closed=0 WHERE guild=? AND id=? AND kind='case' AND closed=1").run(guild,id);
     if (!result.changes) return false;
     db.prepare('INSERT INTO entries(record,actor,kind,body) VALUES(?,?,?,?)').run(id,actor,'Reabertura',reason);
+    return true;
+  });
+}
+
+db.exec('CREATE TABLE IF NOT EXISTS case_members (record INTEGER NOT NULL, member TEXT NOT NULL, PRIMARY KEY(record,member))');
+export const caseMembers = id => db.prepare('SELECT member FROM case_members WHERE record=? ORDER BY member').all(id);
+export function changeCaseMember(guild,id,actor,member,include) {
+  return transaction(() => {
+    const record=get(guild,id);
+    if(!record || record.kind!=='case' || record.closed) return false;
+    const sql=include?'INSERT OR IGNORE INTO case_members VALUES (?,?)':'DELETE FROM case_members WHERE record=? AND member=?';
+    if(!db.prepare(sql).run(id,member).changes) return false;
+    db.prepare('INSERT INTO entries(record,actor,kind,body) VALUES(?,?,?,?)').run(id,actor,include?'Integrante adicionado':'Integrante removido','<@'+member+'>');
     return true;
   });
 }

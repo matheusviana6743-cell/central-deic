@@ -76,7 +76,7 @@ function detail(i,record,page=0) {
   if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
   if (!record.closed) {
     controls.push(row(button('note:'+stem,'Adicionar relato'),button('evidence:'+stem,'Vincular evidência'),button('finish:'+stem,'Encerrar',ButtonStyle.Danger)));
-    if(record.kind==='case') controls.push(row(button('mesa:'+stem,'Abrir mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso')));
+    if(record.kind==='case') controls.push(row(button('mesa:'+stem,'Abrir mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso'),button('crew:'+stem,'Equipe')));
   }
   if(records.roomList(i.guildId,record.id).length) controls.push(row(button('release:'+stem,'Finalizar salas vazias')));
   const nav=[];
@@ -168,6 +168,21 @@ export async function handleDesk(i) {
     }
     const record=records.get(i.guildId,Number(action==='pick'?i.values[0]:arg));
     if(!record||record.kind!==kind) return await say(i,'Registro indisponível neste setor.');
+    if(['crew','crew-add','crew-drop','crew-save-add','crew-save-drop'].includes(action)){
+      if(record.kind!=='case' || record.closed || (!chief && record.author!==i.user.id)) return await say(i,'A chefia ou o responsável pode editar a equipe de um caso aberto.');
+      if(action==='crew'){
+        const members=records.caseMembers(record.id);
+        return await i.editReply({content:'**Equipe do caso #'+record.id+'**\n'+(members.map(x=>'<@'+x.member+'>').join(', ') || 'Nenhum integrante designado.'),allowedMentions:{parse:[]},components:[row(button('crew-add:case:'+record.id,'Adicionar integrante'),button('crew-drop:case:'+record.id,'Remover integrante'))]});
+      }
+      if(action==='crew-add'||action==='crew-drop') return await i.editReply({content:'Selecione o integrante.',components:[row(new UserSelectMenuBuilder().setCustomId('rp:crew-save-'+(action==='crew-add'?'add':'drop')+':case:'+record.id))]});
+      const include=action==='crew-save-add';
+      if(include){
+        const member=await i.guild.members.fetch(i.values[0]);
+        if(member.user.bot || !member.roles.cache.some(role=>team.includes(role.name))) return await say(i,'Selecione um integrante ativo da DEIC.');
+        if(records.caseMembers(record.id).length>=50) return await say(i,'A equipe já tem 50 integrantes.');
+      }
+      return await say(i,records.changeCaseMember(i.guildId,record.id,i.user.id,i.values[0],include)?'Equipe atualizada.':'A equipe já estava nesse estado.');
+    }
     if(action==='reopen-save'){
       if(!chief || record.kind!=='case') return await say(i,'Apenas a chefia pode reabrir casos.');
       const reason=input(i,'body');
