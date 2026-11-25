@@ -73,10 +73,10 @@ function detail(i,record,page=0) {
   const entries=records.history(record.id,page);
   const stem=record.kind+':'+record.id;
   const controls=[];
-  if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
+  if(record.kind==='case') controls.push(row(button('export:'+stem,'Exportar histórico'),...(!record.closed?[button('mesa:'+stem,'Voz da mesa')]:[]),...(record.closed?[button('reopen:'+stem,'Reabrir caso')]:[])));
   if (!record.closed) {
     controls.push(row(button('note:'+stem,'Adicionar relato'),button('evidence:'+stem,'Vincular evidência'),button('finish:'+stem,'Encerrar',ButtonStyle.Danger)));
-    if(record.kind==='case') controls.push(row(button('mesa:'+stem,'Abrir mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso'),button('crew:'+stem,'Equipe')));
+    if(record.kind==='case') controls.push(row(button('discussion:'+stem,'Canal da mesa'),button('tocaia:'+stem,'Abrir tocaia'),button('qrr:'+stem,'Registrar QRR'),button('transfer:'+stem,'Passar caso'),button('crew:'+stem,'Equipe')));
   }
   if(records.roomList(i.guildId,record.id).length) controls.push(row(button('release:'+stem,'Finalizar salas vazias')));
   const nav=[];
@@ -108,6 +108,14 @@ async function sessionRoom(i,record,kind) {
     records.add(i.guildId,record.id,i.user.id,kind==='mesa'?'Mesa':'Tocaia RP','Sala de voz aberta para a cena.');
     return say(i,'Entre em <#'+ch.id+'>. Registre o resultado no histórico do caso.');
   } finally {locks.delete(key);}
+}
+
+async function caseThread(i,record) {
+  const room=records.roomList(i.guildId,record.id).find(r=>r.kind==='discussion');
+  if(!room) return null;
+  const thread=await i.guild.channels.fetch(room.channel).catch(error=>{if(error.code!==10003) throw error; return null;});
+  if(!thread) records.forgetRoom(room.channel);
+  return thread?.type===ChannelType.PrivateThread ? thread : null;
 }
 
 export async function handleDesk(i) {
@@ -179,6 +187,24 @@ export async function handleDesk(i) {
     }
     const record=records.get(i.guildId,Number(action==='pick'?i.values[0]:arg));
     if(!record||record.kind!==kind) return await say(i,'Registro indisponível neste setor.');
+    if(action==='discussion'){
+      if(record.kind!=='case' || record.closed || (!chief && record.author!==i.user.id && !records.caseMembers(record.id).some(x=>x.member===i.user.id))) return await say(i,'A mesa está disponível para a equipe designada e a chefia.');
+      const key='discussion:'+i.guildId+':'+record.id;
+      if(locks.has(key)) return await say(i,'A mesa está sendo preparada.');
+      locks.add(key);
+      try {
+        let thread=await caseThread(i,record);
+        if(!thread){
+          const parent=(await i.guild.channels.fetch()).find(c=>c?.type===ChannelType.GuildText && c.parent?.name===sectors.case.name && c.name===sectors.case.channels[2]);
+          if(!parent) return await say(i,'Publique primeiro o painel de mesas.');
+          thread=await parent.threads.create({name:'Mesa RP #'+record.id,type:ChannelType.PrivateThread,invitable:false});
+          records.saveRoom(i.guildId,thread.id,record.id,'discussion');
+        }
+        if(thread.archived) await thread.setArchived(false);
+        for(const member of new Set([record.author,i.user.id,...records.caseMembers(record.id).map(x=>x.member)])) await thread.members.add(member);
+        return await say(i,'Mesa reservada em <#'+thread.id+'>.');
+      } finally {locks.delete(key);}
+    }
     if(['crew','crew-add','crew-drop','crew-save-add','crew-save-drop'].includes(action)){
       if(record.kind!=='case' || record.closed || (!chief && record.author!==i.user.id)) return await say(i,'A chefia ou o responsável pode editar a equipe de um caso aberto.');
       if(action==='crew'){
@@ -192,14 +218,24 @@ export async function handleDesk(i) {
         if(member.user.bot || !member.roles.cache.some(role=>team.includes(role.name))) return await say(i,'Selecione um integrante ativo da DEIC.');
         if(records.caseMembers(record.id).length>=50) return await say(i,'A equipe já tem 50 integrantes.');
       }
+      const thread=await caseThread(i,record);
+      if(thread && i.values[0]!==record.author){
+        if(thread.archived) await thread.setArchived(false);
+        if(include) await thread.members.add(i.values[0]);
+        else await thread.members.remove(i.values[0]);
+      }
       return await say(i,records.changeCaseMember(i.guildId,record.id,i.user.id,i.values[0],include)?'Equipe atualizada.':'A equipe já estava nesse estado.');
     }
     if(action==='reopen-save'){
       if(!chief || record.kind!=='case') return await say(i,'Apenas a chefia pode reabrir casos.');
       const reason=input(i,'body');
       if(!reason || !records.reopen(i.guildId,record.id,i.user.id,reason)) return await say(i,'Informe um motivo para reabrir um caso encerrado.');
+      const thread=await caseThread(i,record);
+      if(thread?.locked) await thread.setLocked(false);
+      if(thread?.archived) await thread.setArchived(false);
     }
     if(action==='export' && record.kind==='case'){
+      if(!chief && record.author!==i.user.id && !records.caseMembers(record.id).some(x=>x.member===i.user.id)) return await say(i,'O relatório é reservado à equipe do caso e à chefia.');
       const header='Caso #'+record.id+' — '+record.title;
       const lines=[header];
       let bytes=Buffer.byteLength(header);
@@ -209,6 +245,12 @@ export async function handleDesk(i) {
         if(bytes>7_000_000) return await say(i,'O histórico excede o limite de exportação.');
         lines.push(line);
       }
+      const thread=await caseThread(i,record);
+      if(thread){
+        const messages=await thread.messages.fetch({limit:100});
+        lines.push('\n\nConversas da mesa RP · até 100 mensagens recentes');
+        for(const message of [...messages.values()].reverse()) lines.push('\n'+message.createdAt.toISOString()+' | '+message.author.id+' | '+message.content);
+      }
       return await i.editReply({files:[{attachment:Buffer.from(lines.join('')),name:'caso-'+record.id+'.txt'}]});
     }
     if(action==='transfer'||action==='handoff'){
@@ -217,6 +259,12 @@ export async function handleDesk(i) {
       if(action==='transfer') return await i.editReply({content:'Selecione quem assume o caso #'+record.id+'.',components:[row(new UserSelectMenuBuilder().setCustomId('rp:handoff:case:'+record.id))]});
       const next=await i.guild.members.fetch({user:i.values[0],force:true});
       if(next.user.bot || !next.roles.cache.some(r=>team.includes(r.name)))return await say(i,'Escolha um integrante ativo da DEIC.');
+      const thread=await caseThread(i,record);
+      if(thread){
+        if(thread.archived) await thread.setArchived(false);
+        await thread.members.add(next.id);
+        if(next.id!==record.author && !records.caseMembers(record.id).some(x=>x.member===record.author)) await thread.members.remove(record.author);
+      }
       records.handoff(i.guildId,record.id,i.user.id,record.author,next.id);
     }
     if(action==='save'){
@@ -224,6 +272,7 @@ export async function handleDesk(i) {
       if(!body||!notes[extra]) return await say(i,'Informe o conteúdo do registro.');
       if(extra==='finish' && record.author!==i.user.id && i.guild.ownerId!==i.user.id && !i.member.roles.cache.some(r=>team.slice(0,2).includes(r.name))) return await say(i,'O responsável pelo registro ou a chefia pode encerrar.');
       records.add(i.guildId,record.id,i.user.id,notes[extra],body);
+      if(extra==='finish' && record.kind==='case'){const thread=await caseThread(i,record);if(thread && !thread.archived) await thread.setLocked(true);if(thread && !thread.archived) await thread.setArchived(true);}
     }
     if(['mesa','tocaia','release'].includes(action) && record.kind==='case' && (!record.closed||action==='release')) return await sessionRoom(i,record,action);
     return await detail(i,records.get(i.guildId,record.id),action==='view'?Number(extra):0);
