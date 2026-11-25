@@ -30,3 +30,13 @@ Para montar a DEIC de Travessia RP, veja [DEIC-TRAVESSIA.md](DEIC-TRAVESSIA.md).
 
 O comando **/ficha** da DEIC usa permissões adicionais descritas no guia DEIC-TRAVESSIA.md.
 
+
+## Academia e participação comunitária DEIC
+
+- `/academia`: aulas e exercícios de conduta, documentação e convivência no RP. A primeira resposta correta de cada aula registra a conclusão.
+- `/perfil`: progresso individual, presenças, aulas e pontos da semana (resposta privada).
+- `/participacao presenca`: uma presença voluntária por dia.
+- `/participacao entrar` e `/participacao sair`: controle voluntário de visibilidade no ranking.
+- `/ranking`: até 10 participantes que autorizaram a exibição, com pontos por presença diária e primeira conclusão de aula. Semana de segunda a domingo, UTC−3.
+
+Não há coleta de mensagens, voz ou atividades fora desses comandos. Os registros são separados por servidor e utilizam o banco SQLite existente, com tabelas novas criadas automaticamente. Faça backup antes da publicação. Execute `npm run check`, `npm test` e `npm run register` antes de disponibilizar os comandos novos.

@@ -53,7 +53,7 @@ export function handoff(guild,id,actor,expected,next) {
   });
 }
 
-export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_status WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM wanted_draft WHERE guild=?','DELETE FROM archive WHERE guild=?']) db.prepare(q).run(guild); }); }
+export function clearGuild(guild) { return transaction(() => { for (const q of ['DELETE FROM entries WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_members WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM case_status WHERE record IN (SELECT id FROM records WHERE guild=?)','DELETE FROM records WHERE guild=?','DELETE FROM rooms WHERE guild=?','DELETE FROM panels WHERE guild=?','DELETE FROM wanted_draft WHERE guild=?','DELETE FROM archive WHERE guild=?','DELETE FROM academy_progress WHERE guild=?','DELETE FROM community_checkins WHERE guild=?','DELETE FROM community_ranking WHERE guild=?']) db.prepare(q).run(guild); }); }
 
 export const timeline = id => db.prepare('SELECT * FROM entries WHERE record=? ORDER BY id').iterate(id);
 export function reopen(guild, id, actor, reason) {
@@ -108,4 +108,53 @@ export function publishWanted(guild,actor,id){
     discardWanted(guild,actor,id);
     return record;
   });
+}
+
+// Community participation is opt-in for leaderboard visibility. No message or voice tracking.
+db.exec(`
+CREATE TABLE IF NOT EXISTS academy_progress (guild TEXT NOT NULL, member TEXT NOT NULL, lesson TEXT NOT NULL, completed INTEGER NOT NULL, PRIMARY KEY(guild,member,lesson));
+CREATE TABLE IF NOT EXISTS community_checkins (guild TEXT NOT NULL, member TEXT NOT NULL, day TEXT NOT NULL, stamp INTEGER NOT NULL, PRIMARY KEY(guild,member,day));
+CREATE TABLE IF NOT EXISTS community_ranking (guild TEXT NOT NULL, member TEXT NOT NULL, PRIMARY KEY(guild,member));
+CREATE INDEX IF NOT EXISTS academy_progress_week ON academy_progress(guild,completed);
+CREATE INDEX IF NOT EXISTS community_checkins_week ON community_checkins(guild,stamp);
+`);
+export function completeLesson(guild,member,lesson,stamp=Math.floor(Date.now()/1000)) {
+  return Boolean(db.prepare('INSERT OR IGNORE INTO academy_progress VALUES(?,?,?,?)').run(guild,member,lesson,stamp).changes);
+}
+export function localDay(stamp) {
+  return new Date((stamp-10800)*1000).toISOString().slice(0,10);
+}
+export function weekStart(stamp) {
+  const local = new Date((stamp-10800)*1000);
+  local.setUTCHours(0,0,0,0);
+  local.setUTCDate(local.getUTCDate()-(local.getUTCDay()+6)%7);
+  return Math.floor(local.getTime()/1000)+10800;
+}
+export function communityCheckin(guild,member,stamp=Math.floor(Date.now()/1000)) {
+  return Boolean(db.prepare('INSERT OR IGNORE INTO community_checkins VALUES(?,?,?,?)').run(guild,member,localDay(stamp),stamp).changes);
+}
+export function rankingVisibility(guild,member,visible) {
+  if (visible) db.prepare('INSERT OR IGNORE INTO community_ranking VALUES(?,?)').run(guild,member);
+  else db.prepare('DELETE FROM community_ranking WHERE guild=? AND member=?').run(guild,member);
+}
+export function communityProfile(guild,member,stamp=Math.floor(Date.now()/1000)) {
+  const start=weekStart(stamp);
+  return {
+    lessons: db.prepare('SELECT lesson FROM academy_progress WHERE guild=? AND member=? ORDER BY lesson').all(guild,member).map(row=>row.lesson),
+    checkins: db.prepare('SELECT count(*) n FROM community_checkins WHERE guild=? AND member=? AND stamp>=? AND stamp<=?').get(guild,member,start,stamp).n,
+    weeklyLessons: db.prepare('SELECT count(*) n FROM academy_progress WHERE guild=? AND member=? AND completed>=? AND completed<=?').get(guild,member,start,stamp).n,
+    visible: Boolean(db.prepare('SELECT 1 FROM community_ranking WHERE guild=? AND member=?').get(guild,member)),
+  };
+}
+export function communityRanking(guild,stamp=Math.floor(Date.now()/1000)) {
+  const start=weekStart(stamp);
+  return db.prepare(`
+    WITH points AS (
+      SELECT member, count(*) n FROM community_checkins WHERE guild=? AND stamp>=? AND stamp<=? GROUP BY member
+      UNION ALL
+      SELECT member, count(*) n FROM academy_progress WHERE guild=? AND completed>=? AND completed<=? GROUP BY member
+    )
+    SELECT p.member, SUM(p.n) points FROM points p JOIN community_ranking r ON p.member=r.member AND r.guild=?
+    GROUP BY p.member ORDER BY points DESC, p.member ASC LIMIT 10
+  `).all(guild,start,stamp,guild,start,stamp,guild);
 }

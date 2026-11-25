@@ -1,3 +1,4 @@
+import { completeLesson } from './records.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { lessons, lessonById, checkAnswer } from './curriculum.js';
 import { team, intelligence } from './deic.js';
@@ -42,7 +43,8 @@ export async function handleAcademy(interaction) {
     const [, id, value, owner] = interaction.customId.split(':');
     const result = /^[0-2]$/.test(value) && checkAnswer(id, Number(value));
     if (owner !== interaction.user.id || !result) return await interaction.reply({ ...privateReply, content: 'Exercício indisponível. Abra sua própria aula.' });
-    await interaction.update({ content: (result.correct ? '✅ Resposta correta! ' : '📚 Revise esta resposta. ') + result.explanation,
+    const first = result.correct && completeLesson(interaction.guildId, interaction.user.id, id);
+    await interaction.update({ content: (result.correct ? '✅ Resposta correta! ' : '📚 Revise esta resposta. ') + result.explanation + (first ? '\n+1 ponto pela primeira conclusão da aula.' : ''),
       embeds: [], components: [], allowedMentions: { parse: [] } });
   } catch (error) {
     console.error('Falha na academia', error.code ?? error.name);
