@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ChannelType } from 'discord.js';
+import { ChannelType, Collection } from 'discord.js';
 process.env.DEIC_DATABASE=':memory:';
 const { navigationCommand, navigationButton, participationRow, academyRow, handleNavigation }=await import('../navigation.js');
 const { academyCommand, handleAcademy }=await import('../academy.js');
 const { participationCommands, handleParticipation }=await import('../participation.js');
 const { deicModules }=await import('../deic.js');
 const { panelCard }=await import('../panel.js');
-const member={roles:{cache:new Map([['a',{name:'DEIC · Agente em formação'}]])}};
-const outsider={roles:{cache:new Map()}};
+const member={roles:{cache:new Collection([['a',{name:'DEIC · Agente em formação'}]])}};
+const outsider={roles:{cache:new Collection()}};
 const roles=(m)=>({inGuild:()=>true,member:m,guildId:'integration',user:{id:'123456789012345678'}});
 test('command and panel builders serialize to valid Discord components',()=>{
   for(const command of [navigationCommand,academyCommand,...participationCommands])assert.ok(command.toJSON().name);
