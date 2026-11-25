@@ -21,7 +21,7 @@ test('navigation excludes channels without ViewChannel permission',async()=>{
   const channels=[{type:ChannelType.GuildText,id:'101',name:section.channels[0],parent:{name:section.name},permissionsFor:()=>({has:()=>true})},
     {type:ChannelType.GuildText,id:'102',name:section.channels[1],parent:{name:section.name},permissionsFor:()=>({has:()=>false})}];
   await handleNavigation({...roles(outsider),guild:{channels:{fetch:async()=>channels}},deferReply:async()=>{},editReply:async p=>{result=p;}});
-  assert.ok(result.embeds[0].fields[0].value.includes('<#101>'));
+  assert.ok(result.content.includes('<#101>'));
   assert.ok(!JSON.stringify(result).includes('<#102>'));
   assert.equal(result.components.length,0);
 });
@@ -45,12 +45,15 @@ test('community check-in button records at most one daily point',async()=>{
   await handleParticipation({...base,member:outsider});assert.match(result.content,/exclusivo/);
 });
 
-test('team navigation never repeats component IDs across rows',async()=>{
+test('team navigation uses a plain text payload with no components',async()=>{
   let result;
   await handleNavigation({...roles(member),guild:{channels:{fetch:async()=>[]}},deferReply:async()=>{},editReply:async p=>{result=p;}});
   const ids=result.components.flatMap(row=>row.toJSON().components.map(c=>c.custom_id));
   assert.equal(new Set(ids).size,ids.length);
-  assert.deepEqual(ids,['community:perfil','community:presenca','community:ranking','academy:menu']);
+  assert.deepEqual(ids,[]);
+  assert.equal(result.embeds.length,0);
+  assert.match(result.content,/central-2026-11-25-r3/);
+  assert.ok(result.content.length<2000);
   assert.equal(academyRow().toJSON().components.length,2);
 });
 
@@ -64,4 +67,10 @@ test('channel names tolerate decoration but preserve explicit sector boundaries'
   assert.equal(matchesSectorChannel({name:'🧩・painel-de-mesas',parent:{name:'DEIC | Gabinete'}},internal,internal.channels[2]),false);
   assert.equal(matchesSectorChannel({name:'🧩・painel-de-mesas-falso',parent:{name:'DEIC | Mesas'}},internal,internal.channels[2]),false);
   assert.equal(matchesSectorChannel({name:'painel-da-direcao',parent:{name:'DEIC | Mesas'}},deicModules.deicComando,deicModules.deicComando.channels[0]),false);
+});
+
+test('normalizes explicit category separators without changing sector names',async()=>{
+ const {sameChannelName}=await import('../deic.js');
+ assert.ok(sameChannelName('🧩・DEIC│Mesas','DEIC | Mesas'));
+ assert.equal(sameChannelName('DEIC│Gabinete','DEIC | Mesas'),false);
 });

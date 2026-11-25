@@ -17,7 +17,7 @@ export const deicPreset = { name: 'DEIC • Travessia RP', themed: true, modules
 
 /** Match an explicitly configured name, ignoring decorative leading emoji and separators. */
 export function channelNameKey(name) {
-  return typeof name==='string' ? name.normalize('NFC').replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s+/g,' ').trim().toLowerCase() : '';
+  return typeof name==='string' ? name.normalize('NFC').replace(/^[^\p{L}\p{N}]+/u,'').replace(/\s*[|｜│┃]\s*/g,' | ').replace(/\s+/g,' ').trim().toLowerCase() : '';
 }
 export function sameChannelName(actual, expected) {
   const key=channelNameKey(expected);

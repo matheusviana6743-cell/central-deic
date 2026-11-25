@@ -1,4 +1,4 @@
-import { handlesNavigation, handleNavigation } from './navigation.js';
+import { handlesNavigation, handleNavigation, navigationRevision } from './navigation.js';
 import { handlesParticipation, handleParticipation } from './participation.js';
 import { handlesAcademy, handleAcademy } from './academy.js';
 import { handlesWipe, handleWipe } from './wipe.js';
@@ -143,14 +143,16 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.once(Events.ClientReady, async ready => {
-  console.log('Servidor Base conectado como '+ready.user.tag);
+  console.log('Servidor Base conectado como '+ready.user.tag+' | revisão '+navigationRevision);
   for(const guild of ready.guilds.cache.values()){
     const reception=deicModules.deicRecepcao;
     try {
       const channels=await guild.channels.fetch();
-      if(!channels.some(c=>matchesSectorChannel(c,reception,reception.channels[0]))) continue;
+      if(!channels.some(c=>matchesSectorChannel(c,reception,reception.channels[0]))) { console.log('Painéis: recepção não reconhecida no servidor '+guild.id); continue; }
+      console.log('Painéis: recepção reconhecida; atualizando mensagens existentes no servidor '+guild.id);
       await publishDesks(guild, Object.values(deicModules));
       await publishGuides(guild, Object.values(deicModules));
+      console.log('Painéis: atualização concluída no servidor '+guild.id);
     }
     catch(error){console.error('Falha ao atualizar recepção',guild.id,error.code??error.name);}
   }
