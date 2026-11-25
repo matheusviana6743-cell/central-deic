@@ -40,3 +40,10 @@ O comando **/ficha** da DEIC usa permissões adicionais descritas no guia DEIC-T
 - `/ranking`: até 10 participantes que autorizaram a exibição, com pontos por presença diária e primeira conclusão de aula. Semana de segunda a domingo, UTC−3.
 
 Não há coleta de mensagens, voz ou atividades fora desses comandos. Os registros são separados por servidor e utilizam o banco SQLite existente, com tabelas novas criadas automaticamente. Faça backup antes da publicação. Execute `npm run check`, `npm test` e `npm run register` antes de disponibilizar os comandos novos.
+
+## Central de navegação e guia público
+
+- `/central`: canais que o integrante pode acessar e atalhos para formação e participação.
+- Os painéis de formação e escala incluem botões de acesso rápido.
+- `public/index.html`: guia web estático do RP, sem acesso ao banco privado.
+- [Checklist de publicação](RELEASE.md): backup, testes, atualização da aplicação existente e rollback.

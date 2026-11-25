@@ -30,15 +30,26 @@ function lessonCard(lesson, user) {
     footer: { text: 'Formação fictícia · Regras e convivência no RP' } }],
     components: [new ActionRowBuilder().addComponents(buttons)] };
 }
+function menuCard(user) {
+  return { embeds: [{ title: 'Academia DEIC', description: 'Escolha uma aula abaixo para começar. Cada conclusão é registrada no seu perfil.', color: 0x245589 }],
+    components: [new ActionRowBuilder().addComponents(lessons.map(lesson => new ButtonBuilder().setCustomId(prefix+'open:'+lesson.id+':'+user).setLabel(lesson.title).setStyle(ButtonStyle.Primary)))] };
+}
 export async function handleAcademy(interaction) {
   try {
     if (!allowed(interaction)) return await interaction.reply({ ...privateReply, content: 'A academia está disponível para integrantes da equipe DEIC.' });
     if (interaction.isChatInputCommand()) {
       const id = interaction.options.getString('aula');
-      if (!id) return await interaction.reply({ ...privateReply, embeds: [{ title: 'Academia DEIC', description: lessons.map(lesson => '• ' + lesson.title).join('\n') + '\n\nUse /academia e escolha uma aula.', color: 0x245589 }] });
+      if (!id) return await interaction.reply({ ...privateReply, ...menuCard(interaction.user.id) });
       const lesson = lessonById(id);
       if (!lesson) return await interaction.reply({ ...privateReply, content: 'Aula indisponível.' });
       return await interaction.reply({ ...privateReply, ...lessonCard(lesson, interaction.user.id) });
+    }
+    if (interaction.customId === prefix+'menu') return await interaction.reply({...privateReply,...menuCard(interaction.user.id)});
+    if (interaction.customId.startsWith(prefix+'open:')) {
+      const [, , id, owner] = interaction.customId.split(':');
+      const lesson=lessonById(id);
+      if(owner!==interaction.user.id||!lesson) return await interaction.reply({...privateReply,content:'Abra sua própria aula.'});
+      return await interaction.update({...lessonCard(lesson,interaction.user.id),allowedMentions:{parse:[]}});
     }
     const [, id, value, owner] = interaction.customId.split(':');
     const result = /^[0-2]$/.test(value) && checkAnswer(id, Number(value));

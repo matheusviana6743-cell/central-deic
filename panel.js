@@ -1,3 +1,4 @@
+import { navigationButton } from './navigation.js';
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, MessageFlags, ModalBuilder,
   OverwriteType, PermissionFlagsBits, SlashCommandBuilder, StringSelectMenuBuilder,
@@ -55,7 +56,7 @@ export function panelCard() {
       description: 'Bem-vindo à DEIC de Travessia RP.\n\n**🪪 Registro de integrante**\nClique em **Registrar**, selecione quem recrutou seu personagem e preencha seu nome RP e passaporte. A direção analisará sua ficha.',
       footer: { text: 'DEIC • Registro de integrantes' },
     }],
-    components: [row(button('intake', 'Registrar', ButtonStyle.Primary))],
+    components: [row(button('intake', 'Registrar', ButtonStyle.Primary), navigationButton())],
   };
 }
 

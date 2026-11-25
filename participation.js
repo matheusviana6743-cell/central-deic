@@ -14,22 +14,23 @@ export const participationCommands=[
     .addSubcommand(s=>s.setName('sair').setDescription('Retire seu perfil do ranking')),
 ];
 const names=new Set(participationCommands.map(c=>c.name));
-export function handlesParticipation(i){return i.isChatInputCommand()&&names.has(i.commandName);}
+export function handlesParticipation(i){return (i.isChatInputCommand()&&names.has(i.commandName))||(i.isButton()&&['community:perfil','community:ranking','community:presenca'].includes(i.customId));}
 export async function handleParticipation(i){
   try {
     if(!i.inGuild()||!i.member?.roles?.cache?.some(role=>roles.has(role.name))) return await i.reply({...reply,content:'Este módulo é exclusivo da equipe DEIC.'});
     const guild=i.guildId,user=i.user.id;
-    if(i.commandName==='perfil'){
+    const command=i.isButton()?i.customId.split(':')[1]:i.commandName;
+    if(command==='perfil'){
       const p=communityProfile(guild,user);
       const list=lessons.map(l=>(p.lessons.includes(l.id)?'✅ ':'▫️ ')+l.title).join('\n');
       return await i.reply({...reply,embeds:[embed('Meu perfil DEIC',list+'\n\n**Presenças nesta semana:** '+p.checkins+'\n**Aulas concluídas nesta semana:** '+p.weeklyLessons+'\n**Pontos semanais:** '+(p.checkins+p.weeklyLessons)+'\n**Ranking:** '+(p.visible?'Visível':'Privado')+'\n\nUse /participacao para alterar a visibilidade.')]});
     }
-    if(i.commandName==='ranking'){
+    if(command==='ranking'){
       const rows=communityRanking(guild);
       const description=rows.length?rows.map((r,n)=>(n+1)+'. <@'+r.member+'> — '+r.points+' ponto(s)').join('\n'):'Nenhum participante voluntário com pontos nesta semana.';
       return await i.reply({...reply,embeds:[embed('Ranking semanal · Comunidade RP',description+'\n\nCada presença diária ou primeira conclusão de aula vale 1 ponto. Reinício às segundas, 00h de Brasília. Use /participacao entrar ou sair.')]});
     }
-    const action=i.options.getSubcommand();
+    const action=i.isButton()?'presenca':i.options.getSubcommand();
     if(action==='presenca'){
       const added=communityCheckin(guild,user);
       return await i.reply({...reply,content:added?'Presença registrada! +1 ponto semanal.':'Você já registrou presença hoje. Confira /perfil.'});

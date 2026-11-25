@@ -1,3 +1,4 @@
+import { academyRow, participationRow } from './navigation.js';
 import { ChannelType } from 'discord.js';
 import { deicModules } from './deic.js';
 import { panelId, savePanel } from './records.js';
@@ -34,6 +35,7 @@ export async function publishGuides(guild, groups) {
     const card = {
       embeds: [{ color: 0x204c64, author: { name: 'POLÍCIA CIVIL  •  TRAVESSIA RP' }, title,
         description, footer: { text: 'DEIC  •  Orientação de setor' } }],
+      components: key==='deicFormacao'?[academyRow()]:key==='deicInterna'&&index===5?[participationRow()]:[],
       allowedMentions: { parse: [] },
     };
     const previousId = panelId(guild.id, channel.id);

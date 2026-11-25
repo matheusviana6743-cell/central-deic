@@ -1,3 +1,4 @@
+import { handlesNavigation, handleNavigation } from './navigation.js';
 import { handlesParticipation, handleParticipation } from './participation.js';
 import { handlesAcademy, handleAcademy } from './academy.js';
 import { handlesWipe, handleWipe } from './wipe.js';
@@ -55,6 +56,7 @@ function preview(id, session) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (handlesNavigation(interaction)) return handleNavigation(interaction);
   if (handlesParticipation(interaction)) return handleParticipation(interaction);
   if (handlesAcademy(interaction)) return handleAcademy(interaction);
   if (handlesWipe(interaction)) return handleWipe(interaction);

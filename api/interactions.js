@@ -1,38 +1,26 @@
-import { createPublicKey, verify } from 'node:crypto';
-
-const publicKey = process.env.DISCORD_PUBLIC_KEY;
-
-export async function POST(request) {
-  if (!publicKey) return new Response('Public key missing', { status: 503 });
-
-  const signature = request.headers.get('x-signature-ed25519');
-  const timestamp = request.headers.get('x-signature-timestamp');
-  if (!signature || !timestamp || !/^[0-9a-f]{128}$/i.test(signature)) {
-    return new Response('Invalid signature', { status: 401 });
-  }
-
-  const body = await request.text();
-  const key = createPublicKey({
-    key: Buffer.concat([
-      Buffer.from('302a300506032b6570032100', 'hex'),
-      Buffer.from(publicKey, 'hex'),
-    ]),
-    format: 'der',
-    type: 'spki',
-  });
-  const valid = verify(null, Buffer.from(timestamp + body), key, Buffer.from(signature, 'hex'));
-  if (!valid) return new Response('Invalid signature', { status: 401 });
-
-  const interaction = JSON.parse(body);
-  if (interaction.type === 1) {
-    return Response.json({ type: 1 });
-  }
-
-  return Response.json({
-    type: 4,
-    data: {
-      content: 'A versão para Vercel está em preparação. O bot atual continua disponível na instalação local.',
-      flags: 64,
-    },
-  });
+import { MAX_BODY, verifyInteraction } from '../interaction-auth.js';
+export async function POST(request){
+  const publicKey=process.env.DISCORD_PUBLIC_KEY;
+  if(!publicKey||!/^[a-f0-9]{64}$/i.test(publicKey))return new Response('Service unavailable',{status:503});
+  const length=request.headers.get('content-length');
+  if(length&&Number(length)>MAX_BODY)return new Response('Payload too large',{status:413});
+  let body;
+  try{
+    const reader=request.body?.getReader();
+    if(!reader)return new Response('Invalid request',{status:400});
+    let bytes=0;const chunks=[];
+    for(;;){
+      const {done,value}=await reader.read();if(done)break;
+      bytes+=value.byteLength;
+      if(bytes>MAX_BODY){await reader.cancel();return new Response('Payload too large',{status:413});}
+      chunks.push(Buffer.from(value));
+    }
+    body=Buffer.concat(chunks).toString('utf8');
+  }catch{return new Response('Invalid request',{status:400});}
+  if(!verifyInteraction({publicKey,signature:request.headers.get('x-signature-ed25519'),timestamp:request.headers.get('x-signature-timestamp'),body}))return new Response('Invalid signature',{status:401});
+  let interaction;
+  try{interaction=JSON.parse(body);}catch{return new Response('Invalid JSON',{status:400});}
+  if(!interaction||typeof interaction!=='object'||!Number.isInteger(interaction.type))return new Response('Invalid interaction',{status:400});
+  if(interaction.type===1)return Response.json({type:1});
+  return Response.json({type:4,data:{content:'Use o bot CENTRAL-DEIC no Discord. Este endpoint ainda não executa os comandos do bot.',flags:64}});
 }
