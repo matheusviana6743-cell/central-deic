@@ -172,11 +172,12 @@ async function decide(interaction) {
     if (appliedNickname) resultFields.push({ name: 'Apelido aplicado', value: appliedNickname });
     await card.edit({ embeds: [{ ...embed, color: appliedNickname ? 0x208456 : 0xb23b46, fields: resultFields }], components: [], allowedMentions: noMentions });
     const account = await interaction.client.users.fetch(candidate).catch(() => null);
-    if (account) await account.send({ allowedMentions: noMentions, content: appliedNickname
-      ? `🟢 **DEIC • Travessia RP**\nSua ficha foi aprovada. Seu apelido agora é **${appliedNickname}**.`
+    const delivered = account && await account.send({ allowedMentions: noMentions, content: appliedNickname
+      ? `🟢 **DEIC • Travessia RP**\nSua ficha foi aprovada! Bem-vindo(a) à DEIC de Travessia RP.\nCargo de ingresso: **${job.role}**\nSeu apelido no servidor: **${appliedNickname}**`
       : '🔴 **DEIC • Travessia RP**\nSua ficha foi recusada. Procure a recepção se precisar de detalhes.',
-    }).catch(() => {});
-    await interaction.editReply(appliedNickname ? `Ficha aprovada. Apelido aplicado: **${appliedNickname}**.` : 'Ficha recusada.');
+    }).then(() => true, () => false);
+    const notice = delivered ? 'Mensagem privada enviada.' : 'O Discord não permitiu enviar a mensagem privada.';
+    await interaction.editReply((appliedNickname ? `Ficha aprovada. Apelido aplicado: **${appliedNickname}**.` : 'Ficha recusada.') + '\n' + notice);
   } finally {
     locks.delete(key);
   }
