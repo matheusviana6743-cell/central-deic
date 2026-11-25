@@ -96,7 +96,7 @@ async function openTicket(interaction, kind) {
     });
     if (previous) return await tell(interaction, `Seu ticket aberto está em <#${previous.id}>.`);
     const category = channels.find(channel => channel?.type === ChannelType.GuildCategory && sameChannelName(channel.name,ticketCategory));
-    const staffNames = kind === 'direcao' ? agents.slice(0, 2) : agents;
+    const staffNames = agents.slice(0, 2);
     const staff = roles.filter(role => staffNames.includes(role.name) && !role.managed);
     if (!category || !staff.size || new Set(staff.map(role => role.name)).size !== staff.size) {
       return await tell(interaction, 'Reaplique os módulos Atendimento e Gabinete. Confira se os cargos DEIC estão com nomes únicos.');
@@ -108,7 +108,7 @@ async function openTicket(interaction, kind) {
     }
     const state = { owner: user.id, kind, status: 'aberto', agent: '-' };
     const channel = await guild.channels.create({
-      name: `ticket-${kind}-${user.id.slice(-8)}`, type: ChannelType.GuildText,
+      name: `🎫・atendimento-${kind}-${user.id.slice(-6)}`, type: ChannelType.GuildText,
       parent: category.id, topic: stateTopic(state),
       permissionOverwrites: [
         { id: guild.id, type: OverwriteType.Role, deny: [ViewChannel] },
@@ -122,8 +122,8 @@ async function openTicket(interaction, kind) {
       await channel.send({
         allowedMentions: { parse: [] },
         embeds: [{
-          color: 0x263e61, title: `🎫 ${ticketTypes[kind].label}`,
-          description: `Solicitante <@${user.id}>\nProtocolo \`${channel.id}\`\n\n${kind === 'consulta' ? 'Informe o passaporte do personagem de Travessia RP. A equipe consulta o Arquivo de Inteligência e responde neste canal.' : 'Descreva o assunto e inclua links ou prints da cidade RP, se forem necessários.'}`,
+          color: 0x263e61, author:{name:'CENTRAL DEIC · ATENDIMENTO'}, title: `🎫 ${ticketTypes[kind].label}`,
+          description: `Solicitante <@${user.id}>\nProtocolo \`${channel.id}\`\n**Situação:** Aguardando direção\n\n${kind === 'consulta' ? 'Informe o passaporte do personagem de Travessia RP. A equipe consulta o Arquivo de Inteligência e responde neste canal.' : 'Descreva o assunto e inclua links ou prints da cidade RP, se forem necessários.'}`,
         }],
         components: [ticketButtons()],
       });
@@ -138,7 +138,12 @@ async function openTicket(interaction, kind) {
 }
 
 async function manageTicket(interaction, action) {
-  if (!interaction.isButton() || interaction.message.author.id !== interaction.client.user.id) return tell(interaction, 'Controle de ticket inválido.');
+  if ((!interaction.isButton() && !(action==='close-save'&&interaction.isModalSubmit())) || (interaction.isButton()&&interaction.message.author.id !== interaction.client.user.id)) return tell(interaction, 'Controle de ticket inválido.');
+  if(action==='close'&&interaction.isButton()){
+    const state=ticketState(interaction.channel);
+    if(!state||state.status!=='aberto'||!(interaction.user.id===interaction.guild.ownerId||interaction.member.roles.cache.some(r=>agents.slice(0,2).includes(r.name))))return tell(interaction,'Somente a direção pode encerrar.');
+    return interaction.showModal(new ModalBuilder().setCustomId(prefix+'close-save').setTitle('Conclusão do atendimento').addComponents(row(new TextInputBuilder().setCustomId('conclusion').setLabel('Conclusão').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000))));
+  }
   await interaction.deferReply(privateReply);
   const key = `ticket:${interaction.channelId}`;
   if (locks.has(key)) return tell(interaction, 'Este ticket está sendo atualizado.');
@@ -149,7 +154,7 @@ async function manageTicket(interaction, action) {
     const state = ticketState(channel);
     if (!state || state.status !== 'aberto') return await tell(interaction, 'Este ticket já está encerrado ou indisponível.');
     const reviewer = await guild.members.fetch({ user: user.id, force: true });
-    const names = state.kind === 'direcao' ? agents.slice(0, 2) : agents;
+    const names = agents.slice(0, 2);
     const staff = user.id === guild.ownerId || reviewer.roles.cache.some(role => names.includes(role.name));
     if (!staff) return await tell(interaction, 'A equipe responsável pode assumir ou encerrar o ticket.');
     if (action === 'claim') {
@@ -158,12 +163,16 @@ async function manageTicket(interaction, action) {
       await channel.send({ content: `👤 Atendimento assumido por <@${user.id}>.`, allowedMentions: { parse: [] } });
       return await tell(interaction, 'Ticket assumido.');
     }
+    if(action!=='close-save')return tell(interaction,'Controle inválido.');
+    const conclusion=interaction.fields.getTextInputValue('conclusion').trim();
+    if(!conclusion)return tell(interaction,'Informe a conclusão.');
+    await channel.send({embeds:[{color:0x64748b,title:'🔒 Atendimento encerrado',description:conclusion,footer:{text:'Conclusão da direção'}}],allowedMentions:{parse:[]}});
     await channel.permissionOverwrites.edit(state.owner, {
       ViewChannel: true, SendMessages: false, SendMessagesInThreads: false,
       CreatePublicThreads: false, CreatePrivateThreads: false, AddReactions: false,
     }, { type: OverwriteType.Member, reason: 'Ticket DEIC encerrado' });
-    await channel.edit({ topic: stateTopic({ ...state, status: 'encerrado' }), name: `encerrado-${channel.name}` });
-    await interaction.message.edit({ components: [] }).catch(() => {});
+    await channel.edit({ topic: stateTopic({ ...state, status: 'encerrado' }), name: `🔒・${channel.name.replace(/^[^\\p{L}\\p{N}]+/u,'').slice(0,85)}` });
+    if(interaction.message)await interaction.message.edit({ components: [] }).catch(() => {});
     await channel.send({ content: `🔒 Encerrado por <@${user.id}>. O histórico segue disponível para consulta.`, allowedMentions: { parse: [] } });
     await tell(interaction, 'Ticket encerrado.');
   } finally {
@@ -186,7 +195,7 @@ export async function handlePanel(interaction) {
     if (!interaction.inGuild() || !interaction.guild) return await tell(interaction, 'Use a central no servidor da DEIC.');
     if (interaction.isChatInputCommand()) return await publish(interaction);
     const [, action, recruiter] = interaction.customId.split(':');
-    if (action === 'claim' || action === 'close') return await manageTicket(interaction, action);
+    if (action === 'claim' || action === 'close' || action === 'close-save') return await manageTicket(interaction, action);
     if(action==='ticket' && interaction.isStringSelectMenu() && matchesSectorChannel(interaction.channel,deicModules.deicTickets,'🎫・abrir-ticket')) return await openTicket(interaction,interaction.values[0]);
     if (!isPanelRoom(interaction.channel)) return await tell(interaction, 'Use o painel da recepção.');
     if(action==='configure' && interaction.isButton()){

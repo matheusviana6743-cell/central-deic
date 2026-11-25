@@ -51,3 +51,7 @@ Não há coleta de mensagens, voz ou atividades fora desses comandos. Os registr
 ## Painel individual da mesa RP
 
 Cada mesa de texto registrada recebe nome `📁・mesa-0005-titulo`, quatro tópicos de documentação e um painel com **Gerenciar integrantes** e **Fechar mesa**. O responsável ou chefia pode atualizar a lista de integrantes. Essa lista não concede nem revoga cargos ou acesso ao canal. O encerramento exige confirmação, registra o desfecho e tenta bloquear e arquivar os tópicos ativos reconhecidos; mensagens e canal permanecem. Os acessos do canal são preservados. Na inicialização, o bot tenta atualizar painéis e nomes das mesas registradas anteriormente, sem recriar canais.
+
+## Centrais de registros RP
+
+Após registrar os comandos, a direção executa `/organizar-registros` para criar quatro categorias privadas com registrar, publicados e arquivados. Os canais antigos não são apagados. Rascunhos usam formulários com prévia e edição; `/foto-registro` anexa captura fictícia opcional. A publicação e o cancelamento removem somente o canal temporário. A direção arquiva os registros. Não inclua dados reais. O módulo de personagens usa informações narrativas fictícias, não rastreamento. Mesas encerradas recebem um cadeado no nome. Tickets são assumidos e encerrados pela direção, com conclusão obrigatória. Transcripts e migração dos registros antigos ainda não foram implementados. Links de imagens do Discord podem expirar; não constituem armazenamento permanente de mídia. Estados pendentes de publicação/arquivamento exigem revisão manual.

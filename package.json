@@ -11,7 +11,7 @@
     "register": "node --env-file-if-exists=.env register.js",
     "backup": "node --env-file-if-exists=.env backup.js",
     "test": "node --test",
-    "check": "node --check bot.js && node --check register.js && node --check academy.js && node --check curriculum.js && node --check records.js && node --check participation.js && node --check navigation.js && node --check interaction-auth.js && node --check api/interactions.js && node --check api/health.js && node --check mesa-panel.js"
+    "check": "node --check bot.js && node --check register.js && node --check academy.js && node --check curriculum.js && node --check records.js && node --check participation.js && node --check navigation.js && node --check interaction-auth.js && node --check api/interactions.js && node --check api/health.js && node --check mesa-panel.js && node --check forms.js && node --check form-model.js && node --check panel.js"
   },
   "dependencies": {
     "discord.js": "14.26.4"

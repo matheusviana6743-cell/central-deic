@@ -8,9 +8,9 @@ const noMentions={parse:[]};
 const color=0x204c64;
 const row=(...items)=>new ActionRowBuilder().addComponents(...items);
 const button=(action,id,label,style=ButtonStyle.Secondary)=>new ButtonBuilder().setCustomId('mesa-ui:'+action+':'+id).setLabel(label).setStyle(style);
-export function mesaName(id,title){
+export function mesaName(id,title,closed=false){
   const slug=String(title).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,65).replace(/-$/,'')||'registro';
-  return '📁・mesa-'+String(id).padStart(4,'0')+'-'+slug;
+  return (closed?'🔒':'📁')+'・mesa-'+String(id).padStart(4,'0')+'-'+slug;
 }
 export function mesaCard(record,members=[]){
   const count=members.filter(m=>m.member!==record.author).length;
@@ -59,7 +59,7 @@ export async function publishExistingMesaPanels(guild){
       const record=records.get(guild.id,item.record);
       if(!record||!channel||channel.type!==ChannelType.GuildText)continue;
       if(await publishMesaPanel(guild,channel,record)){
-        const target=mesaName(record.id,record.title);
+        const target=mesaName(record.id,record.title,Boolean(record.closed));
         if(channel.name!==target) await channel.setName(target).catch(e=>{console.warn('Nome da mesa não atualizado',e.code??e.name);});
         updated++;
       }
@@ -122,6 +122,7 @@ export async function handleMesaPanel(i){
       const current=records.get(i.guildId,id);
       if(!current||current.closed||!canManageMesa(i.guild,i.channel,i.member,current,i.user.id))return await i.editReply({content:'Mesa já encerrada ou acesso alterado.'});
       records.add(i.guildId,id,i.user.id,'Encerramento','Mesa RP encerrada pelo painel de gerenciamento.');
+      await i.channel.setName(mesaName(id,current.title,true)).catch(e=>console.warn('Nome de mesa encerrada pendente',e.code??e.name));
       const archived=await archiveMesaTopics(i.channel);
       let panelOk=false;
       try{panelOk=await publishMesaPanel(i.guild,i.channel,records.get(i.guildId,id));}catch(e){console.warn('Atualização visual pendente',e.code??e.name);}

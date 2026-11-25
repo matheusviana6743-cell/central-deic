@@ -1,3 +1,4 @@
+import { handlesForms,handleForms } from './forms.js';
 import { handlesMesaPanel, handleMesaPanel, publishExistingMesaPanels } from './mesa-panel.js';
 import { handlesNavigation, handleNavigation, navigationRevision } from './navigation.js';
 import { handlesParticipation, handleParticipation } from './participation.js';
@@ -57,6 +58,7 @@ function preview(id, session) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (handlesForms(interaction)) return handleForms(interaction);
   if (handlesMesaPanel(interaction)) return handleMesaPanel(interaction);
   if (handlesNavigation(interaction)) return handleNavigation(interaction);
   if (handlesParticipation(interaction)) return handleParticipation(interaction);
