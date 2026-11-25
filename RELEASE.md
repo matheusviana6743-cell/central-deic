@@ -19,3 +19,5 @@
 O endpoint HTTP opcional não substitui o gateway do Discord na Discloud. O catálogo público em public/ é independente, estático e não contém registros privados. Hospedagem web deve ser configurada separadamente.
 
 Não registre tokens em commits nem compartilhe o banco de produção em uma página pública.
+
+O workflow de validação gera o artefato `central-deic-discloud` após os testes. Ele contém o ZIP da versão, sem banco SQLite, credenciais, backups ou dependências locais. Baixe o artefato na execução correspondente à revisão aprovada.

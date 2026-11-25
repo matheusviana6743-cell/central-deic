@@ -19,3 +19,12 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Montar pacote para atualização da Discloud
+        run: |
+          git archive --format=zip --output=central-deic-discloud.zip HEAD -- bot.js register.js backup.js archive.js catalog.js deic.js desks.js guides.js intake.js panel.js records.js setup.js wipe.js academy.js curriculum.js participation.js navigation.js interaction-auth.js package.json package-lock.json discloud.config README.md DEIC-TRAVESSIA.md RELEASE.md api database public
+      - uses: actions/upload-artifact@v4
+        with:
+          name: central-deic-discloud
+          path: central-deic-discloud.zip
+          if-no-files-found: error
+          retention-days: 7
