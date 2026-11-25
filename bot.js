@@ -1,3 +1,4 @@
+import { handlesAcademy, handleAcademy } from './academy.js';
 import { handlesWipe, handleWipe } from './wipe.js';
 import { handleDesk, publishDesks } from './desks.js';
 import { publishGuides } from './guides.js';
@@ -53,6 +54,7 @@ function preview(id, session) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (handlesAcademy(interaction)) return handleAcademy(interaction);
   if (handlesWipe(interaction)) return handleWipe(interaction);
   if (interaction.customId?.startsWith('rp:')) return handleDesk(interaction);
   if (handlesPanel(interaction)) return handlePanel(interaction);

@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env bot.js",
     "register": "node --env-file-if-exists=.env register.js",
-    "backup": "node --env-file-if-exists=.env backup.js"
+    "backup": "node --env-file-if-exists=.env backup.js",
+    "test": "node --test",
+    "check": "node --check bot.js && node --check register.js && node --check academy.js && node --check curriculum.js"
   },
   "dependencies": {
     "discord.js": "14.26.4"
