@@ -1,3 +1,7 @@
+import { formCommands } from './forms.js';
+import { navigationCommand } from './navigation.js';
+import { participationCommands } from './participation.js';
+import { academyCommand } from './academy.js';
 import { wipeCommand } from './wipe.js';
 import { panelCommand } from './panel.js';
 import { intakeCommand } from './intake.js';
@@ -22,7 +26,7 @@ const legacyWipeCommand = new SlashCommandBuilder()
   .setName('apagar-canais')
   .setDescription('Limpar canais, cargos e registros deste servidor')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
-const commands = [command, intakeCommand, panelCommand, wipeCommand, legacyWipeCommand];
+const commands = [...formCommands, command, intakeCommand, panelCommand, academyCommand, navigationCommand, ...participationCommands, wipeCommand, legacyWipeCommand];
 for (const entry of commands) {
   if (!guildId) {
     entry.setContexts(InteractionContextType.Guild)

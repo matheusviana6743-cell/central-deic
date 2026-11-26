@@ -1,6 +1,7 @@
+import { mesaName, mesaTopics, publishMesaPanel } from './mesa-panel.js';
 import { migrate } from './archive.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, MessageFlags, ModalBuilder, PermissionFlagsBits, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, UserSelectMenuBuilder } from 'discord.js';
-import { deicModules as modules, team, intelligence } from './deic.js';
+import { deicModules as modules, team, intelligence, matchesSectorChannel } from './deic.js';
 import * as records from './records.js';
 import { panelCard, ticketMenu } from './panel.js';
 
@@ -47,12 +48,14 @@ export async function publishDesks(guild, groups) {
   const desks = [[modules.deicRecepcao,'public',0],[modules.deicTickets,'ticket',0],[modules.deicInterna,'case',0],[modules.deicInterna,'tocaia',1],[modules.deicInterna,'mesa',2],[modules.deicInterna,'relatorio',3],[modules.deicIntel,'intel',0],[modules.deicComando,'admin',0]];
   for (const [sector,kind,index] of desks) {
     if (!groups.some(g=>g.name===sector.name)) continue;
-    const channel = channels.find(c=>c?.type===ChannelType.GuildText && c.name===sector.channels[index] && c.parent?.name===sector.name);
+    const channel = channels.find(c=>c?.type===ChannelType.GuildText && matchesSectorChannel(c,sector,sector.channels[index]));
     if (!channel) continue;
+    if (sector.access && channel.permissionsFor(guild.roles.everyone)?.has(PermissionFlagsBits.ViewChannel)!==false) continue;
     const card = deskCard(kind);
     const id = records.panelId(guild.id,channel.id);
     let msg = id ? await channel.messages.fetch(id).catch(e=>{if(e.code!==10008)throw e;return null;}) : null;
-    if (!msg) msg=(await channel.messages.fetch({limit:50})).find(m=>m.author.id===guild.client.user.id && (m.embeds[0]?.title===card.embeds[0].title || (kind==='public' && m.embeds[0]?.title==='DEIC | Central de Atendimento') || (kind==='ticket' && m.embeds[0]?.title==='DEIC | Abrir atendimento') || (['case','intel','admin'].includes(kind) && m.embeds[0]?.title===card.embeds[0].title.replace('DEIC  |  ','DEIC | '))));
+    if(msg && msg.author.id!==guild.client.user.id) msg=null;
+    if (!msg) msg=(await channel.messages.fetch({limit:50})).find(m=>m.author.id===guild.client.user.id && (m.embeds[0]?.title===card.embeds[0].title || (kind==='tocaia' && m.embeds[0]?.title==='🎯 Tocaias de Travessia RP') || (kind==='public' && m.embeds[0]?.title==='DEIC | Central de Atendimento') || (kind==='ticket' && m.embeds[0]?.title==='DEIC | Abrir atendimento') || (['case','intel','admin'].includes(kind) && m.embeds[0]?.title===card.embeds[0].title.replace('DEIC  |  ','DEIC | '))));
     msg=msg?await msg.edit(card):await channel.send(card);
     records.savePanel(guild.id,channel.id,msg.id);
   }
@@ -121,8 +124,10 @@ async function caseThread(i,record) {
 export async function handleDesk(i) {
   const [,action,kind,arg,extra]=i.customId.split(':');
   const sector=sectors[kind]??sectors.admin;
-  const authorized=i.guild && i.channel?.parent?.name===sector.name && (kind==='case' ? sector.channels.includes(i.channel?.name) : i.channel?.name===sector.channels[0]) &&
-    (i.user.id===i.guild.ownerId || i.member.roles.cache.some(r=>sector.access.includes(r.name)));
+  const allowedNames=kind==='case'?sector.channels:[sector.channels[0]];
+  const authorized=i.guild && i.channel?.type===ChannelType.GuildText && allowedNames.some(name=>matchesSectorChannel(i.channel,sector,name)) &&
+    i.channel.permissionsFor(i.member)?.has(PermissionFlagsBits.ViewChannel) &&
+    (i.user.id===i.guild.ownerId || i.member?.roles?.cache?.some(r=>sector.access.includes(r.name)));
   if(!authorized) return i.reply({...quiet,content:'Este controle pertence ao painel reservado do seu setor.'});
   try {
     const chief = i.user.id===i.guild.ownerId || i.member.roles.cache.some(r=>team.slice(0,2).includes(r.name));
@@ -153,9 +158,10 @@ export async function handleDesk(i) {
         const channel=await i.guild.channels.create({type:ChannelType.GuildText,parent:parent.id,name:'mesa-'+slug});
         const id=records.create(i.guildId,kind,name,i.user.id,body);
         records.saveRoom(i.guildId,channel.id,id,'legacy-mesa');
-        await channel.send({allowedMentions:{parse:[]},embeds:[{color,title:'📂 Mesa investigativa · '+title,description:'Responsável: <@'+i.user.id+'>\nCaso #'+id+'\n\nUse os tópicos abaixo para organizar os registros do jogo.'}]});
+        await channel.setName(mesaName(id,title)).catch(e=>console.warn('Nome da mesa não atualizado',e.code??e.name));
+        await publishMesaPanel(i.guild,channel,records.get(i.guildId,id));
         const failed=[];
-        for(const topic of ['Informações','Fotos do RP','Documentos','Relatórios']){
+        for(const topic of mesaTopics){
           try { await channel.threads.create({name:topic,type:ChannelType.PublicThread}); }
           catch { failed.push(topic); }
         }
@@ -200,7 +206,7 @@ export async function handleDesk(i) {
     if(action==='queue'){
       const channels=await i.guild.channels.fetch();
       const tickets=channels.filter(c=>c?.parent?.name===modules.deicTickets.name && c.topic?.startsWith('deic-ticket|'));
-      const review=channels.find(c=>c?.parent?.name===modules.deicComando.name && c.name==='🪪・triagem-de-fichas');
+      const review=channels.find(c=>matchesSectorChannel(c,modules.deicComando,'🪪・triagem-de-fichas'));
       return await say(i,'**Atendimento**\nAbertos: '+tickets.filter(c=>c.topic.includes('|aberto|')).size+' • Encerrados: '+tickets.filter(c=>c.topic.includes('|encerrado|')).size+'\n**Aprovações e cargos de ingresso**\n'+(review?'<#'+review.id+'>':'Reaplique o módulo Gabinete.'));
     }
     if(action==='access') return await i.editReply({content:'Selecione um integrante para gerenciar o acesso ao arquivo de inteligência.',components:[row(new UserSelectMenuBuilder().setCustomId('rp:member'))]});
@@ -232,7 +238,7 @@ export async function handleDesk(i) {
       try {
         let thread=await caseThread(i,record);
         if(!thread){
-          const parent=(await i.guild.channels.fetch()).find(c=>c?.type===ChannelType.GuildText && c.parent?.name===sectors.case.name && c.name===sectors.case.channels[2]);
+          const parent=(await i.guild.channels.fetch()).find(c=>c?.type===ChannelType.GuildText && matchesSectorChannel(c,sectors.case,sectors.case.channels[2]));
           if(!parent) return await say(i,'Publique primeiro o painel de mesas.');
           thread=await parent.threads.create({name:'Mesa RP #'+record.id,type:ChannelType.PrivateThread,invitable:false});
           records.saveRoom(i.guildId,thread.id,record.id,'discussion');

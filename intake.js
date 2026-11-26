@@ -2,7 +2,7 @@ import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, MessageFlags,
   PermissionFlagsBits, SlashCommandBuilder, StringSelectMenuBuilder,
 } from 'discord.js';
-import { deicModules, team } from './deic.js';
+import { deicModules, team, sameChannelName } from './deic.js';
 
 export const intakeChannel = '🏷️・solicitar-tag';
 export const reviewChannel = '🪪・triagem-de-fichas';
@@ -33,7 +33,7 @@ function nickname(tag, name, passport) {
 }
 
 function inChannel(channel, name, category) {
-  return channel?.type === ChannelType.GuildText && channel.name === name && channel.parent?.name === category;
+  return channel?.type === ChannelType.GuildText && sameChannelName(channel.name,name) && sameChannelName(channel.parent?.name,category);
 }
 
 function isPrivate(channel, guild) {

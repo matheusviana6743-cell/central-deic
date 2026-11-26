@@ -1,5 +1,6 @@
+import { academyRow, participationRow } from './navigation.js';
 import { ChannelType } from 'discord.js';
-import { deicModules } from './deic.js';
+import { deicModules, matchesSectorChannel } from './deic.js';
 import { panelId, savePanel } from './records.js';
 
 const cards = [
@@ -14,8 +15,8 @@ const cards = [
   ['deicOperacoes', 0, '📟  CHAMADOS E APOIO', 'Coordene aqui os pedidos de apoio da equipe dentro de Travessia RP.\n\n**Modelo de chamado**\n> Cena ou caso nº · Equipe solicitante · Tipo de apoio · Situação atual\n\nPedidos feitos no painel da cidade podem ser referenciados no caso pelo botão **Registrar QRR**.'],
   ['deicOperacoes', 1, '📍  CENAS EM ANDAMENTO', 'A equipe pode informar aqui quais cenas RP estão em curso para facilitar a coordenação do plantão.\n\n**Modelo**\n> Caso nº · Equipe na cena · Início · Sala de voz usada · Estado atual\n\nUse os painéis de mesa e tocaia para abrir as salas de voz ligadas ao caso.'],
   ['deicOperacoes', 2, '📋  RESULTADOS DAS CENAS', 'Depois de uma cena, registre o que ocorreu e o próximo passo para a equipe.\n\n**Modelo**\n> Caso nº · Participantes · Resumo da cena RP · Evidências · Pendências\n\nInclua o resultado no histórico do caso pelo painel de relatórios.'],
-  ['deicFormacao', 0, '📚  ORIENTAÇÕES DA EQUIPE', 'Bem-vindo à formação da DEIC. Conheça os painéis antes de participar de uma investigação.\n\n**Percurso inicial**\n1. Leia as regras e orientações da recepção.\n2. Consulte a central de plantão e observe como um caso é registrado.\n3. Acompanhe uma mesa ou cena autorizada com a equipe.\n4. Registre seu relato no caso correspondente após a atividade.\n\nSeu acesso aos setores acompanha o cargo recebido no servidor.'],
-  ['deicFormacao', 1, '📝  TREINAMENTOS RP', 'Organize aqui as atividades de formação dos personagens da DEIC.\n\n**Modelo de sessão**\n> Tema · Instrutor · Dia e horário · Participantes · Cena de treinamento · Resultado\n\nRegistre as decisões relevantes no caso usado durante a simulação.'],
+  ['deicFormacao', 0, '📚  MATERIAL DE FORMAÇÃO', 'Bem-vindo à formação da DEIC. Conheça os painéis antes de participar de uma investigação.\n\n**Percurso inicial**\n1. Leia as regras e orientações da recepção.\n2. Consulte a central de plantão e observe como um caso é registrado.\n3. Acompanhe uma mesa ou cena autorizada com a equipe.\n4. Registre seu relato no caso correspondente após a atividade.\n\nSeu acesso aos setores acompanha o cargo recebido no servidor.'],
+  ['deicFormacao', 1, '📅  AGENDA DE AULAS', 'Canal exclusivo para datas e horários de aulas, reuniões de formação e orientações da comunidade RP.\n\n**Modelo de agendamento**\n> Tema · Instrutor · Dia e horário · Sala de voz · Vagas\n\nO material de estudo fica no canal de material de formação.'],
   ['deicIntel', 1, '🔗  CONEXÕES RP', 'Espaço de análise reservado à inteligência. Relacione personagens, organizações e casos **apenas com base nas cenas de Travessia RP**.\n\n**Modelo**\n> Dossiê ou caso nº · Personagens envolvidos · Relação observada · Cena que sustenta a anotação · Pendência\n\nAtualize também o dossiê pesquisável no painel do arquivo.'],
   ['deicIntel', 2, '📑  ANÁLISES DA EQUIPE', 'Reúna hipóteses e encaminhamentos de inteligência para as investigações do RP.\n\n**Modelo**\n> Dossiê nº · Fatos registrados · Hipótese da equipe · Próxima cena necessária · Responsável\n\nDiferencie observações da cena das hipóteses do personagem.'],
   ['deicComando', 2, '📋  DECISÕES DA DIREÇÃO', 'Registro interno das decisões da direção sobre o funcionamento da DEIC em Travessia RP.\n\n**Modelo**\n> Assunto · Decisão · Responsável · Data de início · Casos ou integrantes envolvidos\n\nUse a triagem para aprovar fichas e o painel da direção para acompanhar os registros.'],
@@ -28,12 +29,13 @@ export async function publishGuides(guild, groups) {
     const section = deicModules[key];
     if (!groups.some(group => group.name === section.name)) continue;
     const channel = channels.find(candidate => candidate?.type === ChannelType.GuildText
-      && candidate.name === section.channels[index] && candidate.parent?.name === section.name);
-    if (!channel) continue;
+      && matchesSectorChannel(candidate,section,section.channels[index]));
+    if (!channel || (section.access && channel.permissionsFor(guild.roles.everyone)?.has('ViewChannel')!==false)) continue;
 
     const card = {
       embeds: [{ color: 0x204c64, author: { name: 'POLÍCIA CIVIL  •  TRAVESSIA RP' }, title,
         description, footer: { text: 'DEIC  •  Orientação de setor' } }],
+      components: key==='deicFormacao'&&index===0?[academyRow()]:key==='deicInterna'&&index===5?[participationRow()]:[],
       allowedMentions: { parse: [] },
     };
     const previousId = panelId(guild.id, channel.id);
