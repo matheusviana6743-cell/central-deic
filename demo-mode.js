@@ -57,7 +57,7 @@ function payload(c){
  const buttons=c.kind==='panel'?[...c.choices.map(([label],n)=>btn('create:'+c.key+':'+n,label)),btn('mine:'+c.key,'Meus registros',2)]:c.kind==='view'?[btn('mine:'+c.key,'Consultar'),...(c.filter.endsWith(':done')?[]:[btn('finish:'+c.key,'Concluir meu último',3)]),...(c.key==='summary'?[btn('reset:'+c.key,'Limpar meus testes',2)]:[])]:[];
  return {embeds:[{color:0x2563eb,title:c.title,description:c.text+'\n\n**DEIC DEMO** · Ficção RP · Não envie informações pessoais.',footer:{text:'Central RP · Sessão temporária e individual'}}],components:buttons.length?[{type:1,components:buttons}]:[],allowedMentions:{parse:[]}};
 }
-export async function registerDemo(guild){if(demoTarget(guild.id))await guild.commands.create({name:'montar-demo-deic',description:'Publica os sete setores de demonstração DEIC',defaultMemberPermissions:P.ManageGuild});}
+export async function registerDemo(guild){if(demoTarget(guild.id)){await guild.commands.create({name:'montar-demo-deic',description:'Publica os sete setores de demonstração DEIC',defaultMemberPermissions:P.ManageGuild});console.log('DEIC DEMO R2 | 7 setores | /montar-demo-deic registrado em '+guild.id);}}
 function acl(g,me,kind){const v=kind==='voice',talk=kind==='chat';return [{id:g.id,allow:[P.ViewChannel,...(v?[P.Connect,P.Speak]:[P.ReadMessageHistory,...(talk?[P.SendMessages]:[])])],deny:v?[]:[...(talk?[]:[P.SendMessages]),P.CreatePublicThreads,P.CreatePrivateThreads,P.SendMessagesInThreads]},{id:me.id,allow:[P.ViewChannel,P.ReadMessageHistory,P.SendMessages,P.EmbedLinks,P.ManageChannels]}];}
 async function mount(i){
  if(i.user.id!==i.guild.ownerId||!i.memberPermissions?.has(P.ManageGuild))return i.reply({...eph,content:'Somente o dono pode montar a demo.'});
@@ -67,11 +67,12 @@ async function mount(i){
  await i.deferReply(eph);const g=i.guild,me=await g.members.fetchMe();
  if(!me.permissions.has([P.ManageChannels,P.ViewChannel,P.SendMessages,P.EmbedLinks,P.ReadMessageHistory]))throw Error('Confira as permissões do bot.');
  const before=await g.channels.fetch();
- let count=0,total=0;
+ let count=0,total=0;const newCategories=[];
  const oldCat=before.find(c=>c?.type===ChannelType.GuildCategory&&c.name===legacyCategory);
  for(const s of sections){
   let cat=before.find(c=>c?.type===ChannelType.GuildCategory&&c.name===s.name);
   if(!cat)cat=await g.channels.create({name:s.name,type:ChannelType.GuildCategory,permissionOverwrites:acl(g,me,'info')});
+  newCategories.push(cat);
   for(const c of s.channels){
    const type=c.kind==='voice'?ChannelType.GuildVoice:ChannelType.GuildText;
    const marker=prefix+c.key;
@@ -82,6 +83,7 @@ async function mount(i){
    if(['info','panel','view'].includes(c.kind)){const msgs=await ch.messages.fetch({limit:30});const existing=msgs.find(m=>m.author.id===me.id&&(m.components.some(r=>r.components.some(b=>b.customId?.startsWith(prefix)))||m.embeds.some(e=>e.footer?.text?.startsWith('Central RP · Sessão temporária'))));if(existing)await existing.edit(payload(c));else await ch.send(payload(c));if(c.kind!=='info')count++;}
   }
  }
+ for(let n=0;n<newCategories.length;n++){try{await newCategories[n].setPosition(n);}catch(e){console.warn('Ordenação demo pendente',newCategories[n].id,e.code??e.name);}}
  // Never delete or expose legacy content. Old empty lab is left intact for manual review.
  await i.editReply({content:total+' canais de demo e '+count+' painéis interativos em '+sections.length+' setores. Os sete canais anteriores foram reaproveitados quando encontrados. Canais originais preservados; revise o histórico e as permissões antes de divulgar.'});
  }catch(e){if(i.deferred)await i.editReply({content:'Montagem incompleta: '+String(e.message).slice(0,200)}).catch(()=>{});else if(!i.replied)await i.reply({...eph,content:'Não foi possível iniciar.'}).catch(()=>{});}
