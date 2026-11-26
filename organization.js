@@ -42,7 +42,7 @@ async function upsert(guild,ch,card,components=[]){
  msg=msg?await msg.edit(payload):await ch.send(payload);
  savePanel(guild.id,ch.id,msg.id);
 }
-async function membersForHierarchy(guild){
+export async function membersForHierarchy(guild){
  const members=[];let after='0';
  for(let page=0;page<10;page++){
   const query=new URLSearchParams({limit:'1000',after});

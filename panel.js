@@ -60,16 +60,11 @@ export function panelCard() {
 }
 
 async function publish(interaction) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return tell(interaction, 'Gerenciar servidor é necessário para publicar a central.');
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return tell(interaction, 'Gerenciar servidor é necessário para publicar os painéis.');
   await interaction.deferReply(privateReply);
-  const channels = await interaction.guild.channels.fetch();
-  const channel = channels.find(isPanelRoom);
-  if (!channel) return tell(interaction, 'Reaplique o módulo Recepção da DEIC para criar a central.');
-  const recent = await channel.messages.fetch({ limit: 50 });
-  const previous = recent.find(message => message.author.id === interaction.client.user.id
-    && ['DEIC | Central de Atendimento','🛡️  DEIC  |  Central de Atendimento'].includes(message.embeds[0]?.title));
-  const message = previous ? await previous.edit(panelCard()) : await channel.send(panelCard());
-  await tell(interaction, `Central disponível em <#${channel.id}>. ${message.url}`);
+  const {publishTemplatePanels}=await import('./template-panels.js');
+  const result=await publishTemplatePanels(interaction.guild);
+  return tell(interaction,('Painéis publicados/atualizados: '+result.published+'.'+(result.failures.length?' Pendentes: '+result.failures.join(', ')+'.':'')+(result.notes.length?'\n'+result.notes.join('\n'):'')).slice(0,1900));
 }
 
 function ticketState(channel) {

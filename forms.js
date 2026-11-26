@@ -17,7 +17,7 @@ export const formCommands=[
  new SlashCommandBuilder().setName('organizar-registros').setDescription('Cria as centrais privadas de registros RP sem apagar canais').setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
  new SlashCommandBuilder().setName('foto-registro').setDescription('Anexa uma imagem fictícia ao seu rascunho').addAttachmentOption(o=>o.setName('foto').setDescription('Captura de tela do jogo ou arte fictícia').setRequired(true))
 ];
-function panel(kind){
+export function formPanelCard(kind){
  const spec=formKinds[kind];
  return {allowedMentions:mentions,embeds:[{color:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name,description:'Abra um rascunho privado, preencha o formulário e confira a prévia antes de publicar. Use apenas conteúdo fictício do jogo, sem dados pessoais reais.',footer:{text:'Registro · Publicação · Arquivo'}}],components:[row(btn('start',kind,kind==='character'?'Cadastrar ficha RP':kind==='report'?'Registrar relatório':kind==='scene'?'Registrar relato RP':'Registrar informação',ButtonStyle.Primary),btn('list',kind,'Lista de registros'),...(kind==='character'?[btn('catalog',kind,'Catálogo HTML')]:[]))]};
 }
@@ -58,7 +58,7 @@ async function setup(i){
    if(field==='entry'){
     const recent=await ch.messages.fetch({limit:30});
     const previous=recent.find(m=>m.author.id===g.client.user.id&&[spec.icon+' '+spec.name,layout.oldTitle].includes(m.embeds[0]?.title));
-    if(previous)await previous.edit(panel(kind));else await ch.send(panel(kind));
+    if(previous)await previous.edit(formPanelCard(kind));else await ch.send(formPanelCard(kind));
    }
   }
   db.saveFormSection(g.id,kind,cat.id,...ids);

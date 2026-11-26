@@ -1,3 +1,4 @@
+import { publishTemplatePanels } from './template-panels.js';
 import { channelChoices,restrictChannels,templatePlan,templateRoles } from './template.js';
 import { handlesForms,handleForms } from './forms.js';
 import { handlesMesaPanel, handleMesaPanel, publishExistingMesaPanels } from './mesa-panel.js';
@@ -162,14 +163,16 @@ client.on(Events.InteractionCreate, async interaction => {
       await interaction.deferUpdate();
       sessions.delete(id);
       await applyPlan(interaction.guild ?? await client.guilds.fetch(interaction.guildId), groups, counts);
+      let panelSummary='';
       if (session.customizable) {
-        // The reusable base provisions structure only. Existing records and specialized workflows are not cloned.
+        const result=await publishTemplatePanels(interaction.guild,groups);
+        panelSummary='\nPainéis publicados/atualizados: '+result.published+'.'+(result.failures.length?' Pendentes: '+result.failures.join(', ')+'.':'')+(result.notes.length?'\n'+result.notes.join('\n'):'');
       } else if (session.title === presets.deic.name) {
         await publishDesks(interaction.guild, groups);
         await publishGuides(interaction.guild, groups);
       }
       await interaction.editReply({
-        content: `Estrutura aplicada. Novos itens: ${counts.categories} categorias, ${counts.channels} canais e ${counts.roles} cargos.`,
+        content: (`Estrutura aplicada. Novos itens: ${counts.categories} categorias, ${counts.channels} canais e ${counts.roles} cargos.`+panelSummary).slice(0,1900),
         components: [], embeds: [],
       });
     } catch (error) {
@@ -192,7 +195,7 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.once(Events.ClientReady, async ready => {
-  console.log('Servidor Base conectado como '+ready.user.tag+' | revisão modelo-r6 / '+navigationRevision);
+  console.log('Servidor Base conectado como '+ready.user.tag+' | revisão paineis-r7 / '+navigationRevision);
   for(const guild of ready.guilds.cache.values()){
     const reception=deicModules.deicRecepcao;
     try {
