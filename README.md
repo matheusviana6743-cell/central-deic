@@ -71,3 +71,7 @@ Os cartões têm cores próprias, cabeçalhos, situação e identidade visual. A
 ### Organização r5
 
 O comando `/organizar-registros` também ordena os canais das quatro categorias, mantém o painel de mesas e posiciona mesas abertas antes das encerradas. Atualiza a hierarquia privada por nomes exibidos no Discord e cargos existentes (requer acesso REST à lista de membros; se indisponível, preserva o painel anterior). Formação separa materiais e agenda de aulas, com botão da academia somente nos materiais. Salas de voz de aulas, orientação, estudos e reuniões são criadas com acesso restrito. Nenhum cargo é alterado. Não são excluídos canais ou histórico.
+
+### Modelo reutilizável r6
+
+A opção DEIC do `/montar` usa um catálogo de 12 categorias permanentes do RP. O gestor pode escolher categorias, editar individualmente os canais de texto/voz e escolher cargos opcionais; cargos exigidos pelas áreas privadas são mantidos. A seleção é uma prévia, não modifica o servidor até confirmar. O modelo cria somente estrutura e cargos vazios, sem copiar membros, registros, mensagens, permissões personalizadas, canais temporários ou sistemas especializados. É uma base para novos servidores de roleplay fictício, não uma ferramenta para atividades policiais reais. O rótulo atualizado aparece após registrar os comandos; o valor interno deic é preservado.

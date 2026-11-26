@@ -10,14 +10,20 @@ test('all presets reference existing modules without duplicates', () => {
   }
 });
 
-test('DEIC preset preserves the existing category names and access configuration', () => {
-  assert.deepEqual(presets.deic.modules, Object.keys(deicModules));
-  const groups = plan(presets.deic.modules);
-  for (const [index, key] of presets.deic.modules.entries()) {
-    assert.equal(groups[index].name, deicModules[key].name);
-    assert.deepEqual(groups[index].access, deicModules[key].access);
-    assert.deepEqual(groups[index].channels, deicModules[key].channels);
-  }
+test('DEIC preset contains the current reusable RP category template',async()=>{
+ const {investigativeTemplate,templateRoles,channelChoices,restrictChannels,templatePlan}=await import('../template.js');
+ assert.deepEqual(presets.deic.modules,Object.keys(investigativeTemplate));
+ const groups=plan(presets.deic.modules);
+ assert.equal(groups.length,12);
+ assert.ok(groups.some(g=>g.name.includes('Mesas')&&g.channels.includes('🧩・painel-de-mesas')));
+ assert.ok(groups.some(g=>g.name.includes('Formação')&&g.voice.includes('🎙️・Aula 02')));
+ const selected=restrictChannels(groups[0],['t0']);
+ assert.equal(selected.channels.length,1);
+ assert.equal(channelChoices(groups[0]).length,groups[0].channels.length+(groups[0].voice??[]).length);
+ const result=templatePlan(groups,[]);
+ for(const role of new Set(groups.flatMap(g=>g.access??[])))assert.ok(result[0].roles.includes(role));
+ assert.ok(templateRoles.includes('DEIC'));
+ assert.equal(result.some(g=>g.channels.some(c=>/mesa-0005|rascunho-|ticket-\d/.test(c))),false);
 });
 
 test('every module defines unique channel names within its category', () => {

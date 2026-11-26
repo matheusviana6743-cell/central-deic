@@ -1,7 +1,9 @@
+import { investigativeTemplate, investigativePreset } from './template.js';
 import { deicModules, deicPreset } from './deic.js';
 
 export const modules = {
   ...deicModules,
+  ...investigativeTemplate,
   hospitalEntrada: { name: '🏥・Recepção hospitalar', themed: true, channels: ['🚪・entrada', '📢・avisos-do-hospital', '📋・solicitar-atendimento'], voice: ['🪑・Sala de espera'], roles: ['Paciente'] },
   hospitalAtendimento: { name: '🩺・Atendimento', themed: true, channels: ['📋・triagem', '📅・consultas', '🚑・chamados-ems'], voice: ['🩺・Consultório 01', '🚑・Central EMS'], roles: ['Médico', 'Enfermagem', 'Socorrista'] },
   hospitalPlantao: { name: '🕒・Plantão', themed: true, channels: ['📅・escalas', '🔄・passagem-de-plantao', '📣・comunicados-da-equipe'], voice: ['🎙️・Rádio hospitalar'], roles: ['Chefe de plantão'] },
@@ -23,7 +25,7 @@ export const modules = {
 };
 
 export const presets = {
-  deic: deicPreset,
+  deic: investigativePreset,
   hospital: { name: 'Hospital', themed: true, modules: ['hospitalEntrada', 'hospitalAtendimento', 'hospitalPlantao', 'hospitalDirecao'] },
   policia: { name: 'Polícia', themed: true, modules: ['policiaEntrada', 'policiaCidadaos', 'policiaOperacoes', 'policiaComando', 'policiaSuporte'] },
   comunidade: { name: 'Comunidade', modules: ['recepcao', 'comunidade', 'eventos'] },
