@@ -1,3 +1,4 @@
+import { organizeExtras } from './organization.js';
 import { downloadGameImage,imageAttachment,previewKey } from './form-media.js';
 import { ActionRowBuilder,ButtonBuilder,ButtonStyle,ChannelType,MessageFlags,ModalBuilder,OverwriteType,PermissionFlagsBits,SlashCommandBuilder,TextInputBuilder,TextInputStyle } from 'discord.js';
 import { team,sameChannelName } from './deic.js';
@@ -87,7 +88,8 @@ async function setup(i){
   }
   await archive.setPosition(Math.max(...[...live.values()].filter(c=>c?.type===ChannelType.GuildCategory).map(c=>c.rawPosition),0)+1).catch(()=>{});
  }
- return edit(i,'Centrais reorganizadas. '+moved+' canais antigos movidos para Arquivo anterior; '+skipped+' mantidos para revisão. Nenhuma mensagem ou canal foi apagado.');
+ const extra=await organizeExtras(g).catch(e=>{console.warn('Organização complementar',e.code??e.name);return ['Organização complementar pendente.'];});
+ return edit(i,('Centrais reorganizadas. '+moved+' canais antigos movidos para Arquivo anterior; '+skipped+' mantidos para revisão. Nenhuma mensagem ou canal foi apagado.\n'+extra.join('\n')).slice(0,1900));
  }finally{locks.delete(key);}
 }
 function draftModal(r){

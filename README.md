@@ -67,3 +67,7 @@ As imagens novas (PNG, JPEG ou WebP, até 2 MiB) são armazenadas no SQLite exis
 ### Revisão visual-r4
 
 Os cartões têm cores próprias, cabeçalhos, situação e identidade visual. As fichas narrativas RP destacam o nome do personagem, identificação fictícia, ocorrências da história e observações. Novos cartões usam o visual atualizado; cartões já publicados não são reescritos. Após criar as doze centrais, `/organizar-registros` move somente os antigos canais de relatório e painel de tocaias explicitamente reconhecidos para `DEIC | Arquivo anterior`, mantendo suas permissões e mensagens. Mesas individuais, tickets, canais não reconhecidos e painel de mesas não são removidos. Não há exclusão definitiva.
+
+### Organização r5
+
+O comando `/organizar-registros` também ordena os canais das quatro categorias, mantém o painel de mesas e posiciona mesas abertas antes das encerradas. Atualiza a hierarquia privada por nomes exibidos no Discord e cargos existentes (requer acesso REST à lista de membros; se indisponível, preserva o painel anterior). Formação separa materiais e agenda de aulas, com botão da academia somente nos materiais. Salas de voz de aulas, orientação, estudos e reuniões são criadas com acesso restrito. Nenhum cargo é alterado. Não são excluídos canais ou histórico.
