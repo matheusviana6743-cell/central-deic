@@ -1,3 +1,4 @@
+import { demoTarget, handleDemo, registerDemo } from './demo-mode.js';
 import { publishTemplatePanels } from './template-panels.js';
 import { channelChoices,restrictChannels,templatePlan,templateRoles } from './template.js';
 import { handlesForms,handleForms } from './forms.js';
@@ -89,6 +90,7 @@ function preview(id, session) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (demoTarget(interaction.guildId)) { try { return await handleDemo(interaction); } catch (error) { console.error('Falha na demo DEIC',error.code??error.name); return; } }
   if (handlesForms(interaction)) return handleForms(interaction);
   if (handlesMesaPanel(interaction)) return handleMesaPanel(interaction);
   if (handlesNavigation(interaction)) return handleNavigation(interaction);
@@ -197,6 +199,7 @@ client.on(Events.InteractionCreate, async interaction => {
 client.once(Events.ClientReady, async ready => {
   console.log('Servidor Base conectado como '+ready.user.tag+' | revisão paineis-r7 / '+navigationRevision);
   for(const guild of ready.guilds.cache.values()){
+    if (demoTarget(guild.id)) { try { await registerDemo(guild); } catch(error) { console.error('Falha ao registrar demo DEIC',error.code??error.name); } continue; }
     const reception=deicModules.deicRecepcao;
     try {
       await publishExistingMesaPanels(guild);
