@@ -21,10 +21,10 @@ jobs:
       - run: npm test
       - name: Montar pacote para atualização da Discloud
         run: |
-          git archive --format=zip --output=central-deic-discloud-organizacao-r3.zip HEAD -- bot.js register.js backup.js archive.js catalog.js deic.js desks.js guides.js intake.js panel.js records.js setup.js wipe.js academy.js curriculum.js participation.js mesa-panel.js forms.js form-model.js form-media.js navigation.js interaction-auth.js package.json package-lock.json discloud.config README.md DEIC-TRAVESSIA.md RELEASE.md api database public
+          git archive --format=zip --output=central-deic-discloud-visual-r4.zip HEAD -- bot.js register.js backup.js archive.js catalog.js deic.js desks.js guides.js intake.js panel.js records.js setup.js wipe.js academy.js curriculum.js participation.js mesa-panel.js forms.js form-model.js form-media.js navigation.js interaction-auth.js package.json package-lock.json discloud.config README.md DEIC-TRAVESSIA.md RELEASE.md api database public
       - uses: actions/upload-artifact@v4
         with:
-          name: central-deic-discloud-organizacao-r3
-          path: central-deic-discloud-organizacao-r3.zip
+          name: central-deic-discloud-visual-r4
+          path: central-deic-discloud-visual-r4.zip
           if-no-files-found: error
           retention-days: 7

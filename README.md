@@ -63,3 +63,7 @@ As imagens novas (PNG, JPEG ou WebP, até 2 MiB) são armazenadas no SQLite exis
 ### Organização r3
 
 `/organizar-registros` usa nomes próprios em cada categoria: Relatórios, Tocaias RP (documentação retrospectiva fictícia), Mesas e Procurados RP (fichas narrativas de personagens fictícios). Reutiliza a categoria original quando reconhecida e move somente os canais de registros identificados no banco, preservando as permissões. Não apaga categorias, mensagens, canais antigos ou mesas individuais. Se encontrar duplicatas ambíguas, interrompe a reorganização para revisão manual.
+
+### Revisão visual-r4
+
+Os cartões têm cores próprias, cabeçalhos, situação e identidade visual. As fichas narrativas RP destacam o nome do personagem, identificação fictícia, ocorrências da história e observações. Novos cartões usam o visual atualizado; cartões já publicados não são reescritos. Após criar as doze centrais, `/organizar-registros` move somente os antigos canais de relatório e painel de tocaias explicitamente reconhecidos para `DEIC | Arquivo anterior`, mantendo suas permissões e mensagens. Mesas individuais, tickets, canais não reconhecidos e painel de mesas não são removidos. Não há exclusão definitiva.

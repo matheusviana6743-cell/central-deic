@@ -39,3 +39,18 @@ test('all twelve permanent channel names differ and categories keep the requeste
  assert.equal(selectFormCategory([old],'scene','old',sameChannelName,c=>c.type===4).id,'old');
  assert.throws(()=>selectFormCategory([current,{...current,id:'duplicate'}],'scene','old',sameChannelName,c=>c.type===4));
 });
+
+test('legacy cleanup only selects listed obsolete report channels, preserves current panels and desks',async()=>{
+ const {legacyCleanupCandidates}=await import('../form-model.js');
+ const {sameChannelName}=await import('../deic.js');
+ const ch=(id,name,parent)=>({id,name,parent:{name:parent},type:0});
+ const entries=[ch('a','📝・painel-de-relatorios','📝・DEIC | Relatórios'),ch('b','📋・relatos-de-ocorrencia','📝・DEIC | Relatórios'),ch('c','🎯・painel-de-tocaias','🎯・DEIC | Tocaias RP'),ch('d','🧩・painel-de-mesas','🧩・DEIC | Mesas'),ch('e','🔒・mesa-0005-teste','🧩・DEIC | Mesas'),ch('f','relatos-de-ocorrencia','Outra categoria')];
+ assert.deepEqual(legacyCleanupCandidates(entries,['b'],sameChannelName,c=>c.type===0).map(c=>c.id),['a','c']);
+});
+test('character card emphasizes name and status without new tracking fields',()=>{
+ const payload={name:'Marcelo',code:'RP-001',description:'Enredo fictício',story:'Observação'};
+ const card=formCard('character',1,payload,'Publicado');
+ assert.equal(card.title,'Marcelo');
+ assert.equal(card.fields[1].value,'🟢 Ativa');
+ assert.equal(formCard('character',1,payload,'Arquivado').fields[1].value,'🔒 Arquivada');
+});

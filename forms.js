@@ -1,7 +1,7 @@
 import { downloadGameImage,imageAttachment,previewKey } from './form-media.js';
 import { ActionRowBuilder,ButtonBuilder,ButtonStyle,ChannelType,MessageFlags,ModalBuilder,OverwriteType,PermissionFlagsBits,SlashCommandBuilder,TextInputBuilder,TextInputStyle } from 'discord.js';
 import { team,sameChannelName } from './deic.js';
-import { formKinds,formPayload,formCard,characterCatalog,formLayout,selectFormCategory } from './form-model.js';
+import { formKinds,formPayload,formCard,characterCatalog,formLayout,selectFormCategory,legacyCleanupCandidates } from './form-model.js';
 import * as db from './records.js';
 const quiet={flags:MessageFlags.Ephemeral,allowedMentions:{parse:[]}},mentions={parse:[]};
 const row=(...items)=>new ActionRowBuilder().addComponents(...items);
@@ -18,7 +18,7 @@ export const formCommands=[
 ];
 function panel(kind){
  const spec=formKinds[kind];
- return {allowedMentions:mentions,embeds:[{color:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name,description:'Abra um rascunho privado, preencha o formulário e confira a prévia antes de publicar. Use apenas conteúdo fictício do jogo, sem dados pessoais reais.',footer:{text:'Registro · Publicação · Arquivo'}}],components:[row(btn('start',kind,'Registrar',ButtonStyle.Primary),btn('list',kind,'Lista de registros'),...(kind==='character'?[btn('catalog',kind,'Catálogo HTML')]:[]))]};
+ return {allowedMentions:mentions,embeds:[{color:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name,description:'Abra um rascunho privado, preencha o formulário e confira a prévia antes de publicar. Use apenas conteúdo fictício do jogo, sem dados pessoais reais.',footer:{text:'Registro · Publicação · Arquivo'}}],components:[row(btn('start',kind,kind==='character'?'Cadastrar ficha RP':kind==='report'?'Registrar relatório':kind==='scene'?'Registrar relato RP':'Registrar informação',ButtonStyle.Primary),btn('list',kind,'Lista de registros'),...(kind==='character'?[btn('catalog',kind,'Catálogo HTML')]:[]))]};
 }
 async function setup(i){
  if(!chief(i)||!i.memberPermissions?.has(PermissionFlagsBits.ManageGuild))return i.reply({...quiet,content:'A direção administra a estrutura de registros.'});
@@ -62,7 +62,32 @@ async function setup(i){
   }
   db.saveFormSection(g.id,kind,cat.id,...ids);
  }
- return edit(i,'Centrais reorganizadas com nomes específicos. Os registros, canais anteriores e permissões existentes foram preservados.');
+ const protectedIds=Object.keys(formKinds).flatMap(kind=>{const s=db.formSection(g.id,kind);return s?[s.entry,s.published,s.archived]:[];});
+ if(protectedIds.length!==12||new Set(protectedIds).size!==12)throw Error('Estrutura incompleta');
+ const live=await g.channels.fetch();
+ const candidates=legacyCleanupCandidates([...live.values()],protectedIds,sameChannelName,c=>c?.type===ChannelType.GuildText);
+ let moved=0,skipped=0;
+ if(candidates.length){
+  const archiveName='📦・DEIC | Arquivo anterior';
+  let archive=live.find(c=>c?.type===ChannelType.GuildCategory&&sameChannelName(c.name,archiveName));
+  if(!archive)archive=await g.channels.create({name:archiveName,type:ChannelType.GuildCategory,permissionOverwrites});
+  if(archive.permissionsFor(g.roles.everyone)?.has(PermissionFlagsBits.ViewChannel)!==false)throw Error('Arquivo anterior não privado');
+  for(const channel of candidates){
+   try{
+    if(!privateChannel(g,channel)||!channel.manageable){skipped++;continue;}
+    const before=channel.permissionOverwrites.cache.map(o=>({id:o.id,type:o.type,allow:o.allow.bitfield.toString(),deny:o.deny.bitfield.toString()}));
+    const fingerprint=items=>JSON.stringify([...items].sort((a,b)=>a.id.localeCompare(b.id)));
+    const updated=await channel.setParent(archive.id,{lockPermissions:false,reason:'Reorganizar canais antigos sem apagar registros'});
+    const after=updated.permissionOverwrites.cache.map(o=>({id:o.id,type:o.type,allow:o.allow.bitfield.toString(),deny:o.deny.bitfield.toString()}));
+    if(fingerprint(before)!==fingerprint(after)){
+     await updated.permissionOverwrites.set(before.map(o=>({...o,allow:BigInt(o.allow),deny:BigInt(o.deny)})),'Preservar permissões anteriores');
+    }
+    moved++;
+   }catch(e){skipped++;console.warn('Canal antigo mantido',e.code??e.name);}
+  }
+  await archive.setPosition(Math.max(...[...live.values()].filter(c=>c?.type===ChannelType.GuildCategory).map(c=>c.rawPosition),0)+1).catch(()=>{});
+ }
+ return edit(i,'Centrais reorganizadas. '+moved+' canais antigos movidos para Arquivo anterior; '+skipped+' mantidos para revisão. Nenhuma mensagem ou canal foi apagado.');
  }finally{locks.delete(key);}
 }
 function draftModal(r){
@@ -121,7 +146,7 @@ async function publish(i,r,key){
  if(!db.formTransition(i.guildId,r.id,'draft','publishing'))return edit(i,'Registro já processado.');
  try{
  const ch=await target(i,r,'published');
- const message=await ch.send({...recordMessage(r,payload,'Publicado'),components:[row(btn('archive',r.id,'Arquivar',ButtonStyle.Secondary))]});
+ const message=await ch.send({...recordMessage(r,payload,'Publicado'),components:[row(btn('archive',r.id,r.kind==='character'?'Arquivar ficha':'Arquivar registro',ButtonStyle.Secondary))]});
  if(!db.formPublish(i.guildId,r.id,ch.id,message.id))throw Error('Estado inesperado após publicar');
  await edit(i,'Registro publicado em <#'+ch.id+'>.');
  await i.channel.delete('Rascunho publicado').catch(()=>{});

@@ -2,7 +2,7 @@ export const formKinds=Object.freeze({
  report:{name:'Relatórios',icon:'📝',fields:[['local','Local fictício da cena'],['event','Ocorrido no RP'],['end','Conclusão']]},
  scene:{name:'Tocaias RP',icon:'🎯',fields:[['local','Cenário fictício'],['event','Resumo da cena concluída'],['end','Conclusão narrativa']]},
  mesa:{name:'Mesas',icon:'🧩',fields:[['local','Local fictício da cena'],['info','Informação de RP']]},
- character:{name:'Procurados RP',icon:'🗂️',fields:[['name','Nome do personagem fictício'],['code','Código fictício do jogo'],['description','Descrição narrativa do personagem'],['story','História do personagem']]},
+ character:{name:'Procurados RP',icon:'🗂️',fields:[['name','Nome do personagem RP'],['code','Identificação no jogo (ID RP)'],['description','Ocorrências fictícias do RP'],['story','Observações sobre o enredo']]},
 });
 export function formPayload(kind,raw){
  const spec=formKinds[kind];if(!spec)return null;
@@ -16,7 +16,13 @@ export function formPayload(kind,raw){
 }
 export function formCard(kind,id,payload,status='Prévia'){
  const spec=formKinds[kind];if(!spec)throw Error('Categoria inválida');
- return {color:status==='Arquivado'?0x64748b:0x245589,author:{name:'CENTRAL DEIC · TRAVESSIA RP'},title:spec.icon+' '+spec.name+' · #'+String(id).padStart(4,'0'),description:'**'+status+'** · Conteúdo exclusivamente fictício do RP',fields:spec.fields.map(([key,label])=>({name:label,value:String(payload[key]??'—').slice(0,700)})),footer:{text:'Registro '+id+' · Não inclua dados pessoais reais'},...(typeof payload.photo==='string'&&payload.photo.startsWith('attachment://')?{image:{url:payload.photo}}:{})};
+ const closed=status==='Arquivado',number=String(id).padStart(4,'0');
+ const colors={report:0x377cb3,scene:0x886ab5,mesa:0x258879,character:0xc69b42};
+ const headers={report:'📝 RELATÓRIO DE RP',scene:'🎯 RELATO DE TOCAIA RP',mesa:'🧩 REGISTRO DE MESA',character:'🚩 PROCURADOS RP'};
+ const value=key=>String(payload[key]??'—').trim().slice(0,700)||'—';
+ const fields=kind==='character'?[{name:'Identificação RP',value:value('code'),inline:true},{name:'Situação',value:closed?'🔒 Arquivada':status==='Prévia'?'📝 Rascunho':'🟢 Ativa',inline:true},{name:'Ocorrências fictícias',value:value('description')},{name:'Observações',value:value('story')}]:spec.fields.map(([key,label])=>({name:label,value:value(key)}));
+ const title=kind==='character'?value('name').slice(0,180):headers[kind]+' · #'+number;
+ return {color:closed?0x64748b:colors[kind],author:{name:'POLÍCIA CIVIL · TRAVESSIA RP'},title,description:kind==='character'?'**'+headers[kind]+'** • Ficha #'+number: '**'+(closed?'🔒 Arquivado':status==='Prévia'?'📝 Prévia do registro':'🟢 Publicado')+'**',fields,footer:{text:'DEIC · Registro interno de RP · #'+number},...(typeof payload.photo==='string'&&payload.photo.startsWith('attachment://')?{image:{url:payload.photo}}:{})};
 }
 
 export function characterCatalog(rows){
@@ -40,4 +46,13 @@ export function selectFormCategory(channels,kind,storedId,match,isCategory){
  const canonical=categories.filter(c=>match(c.name,spec.category));
  if(canonical.length>1)throw Error('Categorias duplicadas: '+spec.category);
  return canonical[0]??categories.find(c=>c.id===storedId)??categories.find(c=>match(c.name,spec.oldCategory))??null;
+}
+
+const legacyReportChannels=Object.freeze({
+ 'DEIC | Relatórios':['painel-de-relatorios','relatos-de-ocorrencia','relatos-de-tocaia','resumos-de-mesa','registros-de-qrr','outros-relatorios'],
+ 'DEIC | Tocaias RP':['painel-de-tocaias'],
+});
+export function legacyCleanupCandidates(channels,protectedIds,match,isText){
+ const skip=new Set(protectedIds);
+ return channels.filter(c=>isText(c)&&!skip.has(c.id)&&Object.entries(legacyReportChannels).some(([parent,names])=>match(c.parent?.name,parent)&&names.some(n=>match(c.name,n))));
 }
